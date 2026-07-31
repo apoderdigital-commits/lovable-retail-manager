@@ -8,6 +8,7 @@ import {
   BarChart3,
   LogOut,
   Store,
+  Receipt,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 const nav = [
   { to: "/", label: "Painel", icon: LayoutDashboard },
   { to: "/pdv", label: "Nova venda", icon: ShoppingCart },
+  { to: "/pedidos", label: "Pedidos", icon: Receipt },
   { to: "/produtos", label: "Produtos", icon: Package },
   { to: "/clientes", label: "Clientes", icon: Users },
   { to: "/relatorios", label: "Relatórios", icon: BarChart3 },
