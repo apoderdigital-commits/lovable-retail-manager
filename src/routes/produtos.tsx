@@ -53,6 +53,7 @@ type ProductForm = {
   category: string;
   cost_price: string;
   price: string;
+  wholesale_price: string;
   stock: string;
   min_stock: string;
 };
@@ -63,6 +64,7 @@ const empty: ProductForm = {
   category: "",
   cost_price: "",
   price: "",
+  wholesale_price: "",
   stock: "0",
   min_stock: "0",
 };
@@ -72,6 +74,7 @@ const schema = z.object({
   sku: z.string().trim().max(60),
   category: z.string().trim().max(60),
   price: z.number().nonnegative(),
+  wholesale_price: z.number().nonnegative(),
   cost_price: z.number().nonnegative(),
   stock: z.number().int().min(0),
   min_stock: z.number().int().min(0),
@@ -100,6 +103,7 @@ function ProductsPage() {
         sku: input.sku,
         category: input.category,
         price: Number(input.price || 0),
+        wholesale_price: Number(input.wholesale_price || input.price || 0),
         cost_price: Number(input.cost_price || 0),
         stock: Number(input.stock || 0),
         min_stock: Number(input.min_stock || 0),
@@ -152,6 +156,7 @@ function ProductsPage() {
       category: p.category ?? "",
       cost_price: String(p.cost_price),
       price: String(p.price),
+      wholesale_price: String(p.wholesale_price),
       stock: String(p.stock),
       min_stock: String(p.min_stock),
     });
@@ -205,7 +210,7 @@ function ProductsPage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>Preço de venda</Label>
+                <Label>Preço varejo</Label>
                 <Input
                   type="number"
                   step="0.01"
@@ -214,12 +219,27 @@ function ProductsPage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>Estoque atual</Label>
+                <Label>Preço atacado</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="igual ao varejo se vazio"
+                  value={form.wholesale_price}
+                  onChange={(e) => setForm({ ...form, wholesale_price: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Estoque físico</Label>
                 <Input
                   type="number"
                   value={form.stock}
                   onChange={(e) => setForm({ ...form, stock: e.target.value })}
                 />
+                {form.id && (
+                  <p className="text-xs text-muted-foreground">
+                    O disponível é calculado pelo banco: físico menos reservado.
+                  </p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label>Estoque mínimo</Label>
@@ -255,8 +275,10 @@ function ProductsPage() {
               <TableHead>Produto</TableHead>
               <TableHead>Categoria</TableHead>
               <TableHead className="text-right">Custo</TableHead>
-              <TableHead className="text-right">Venda</TableHead>
-              <TableHead className="text-right">Estoque</TableHead>
+              <TableHead className="text-right">Varejo</TableHead>
+              <TableHead className="text-right">Atacado</TableHead>
+              <TableHead className="text-right">Disponível</TableHead>
+              <TableHead className="text-right">Físico</TableHead>
               <TableHead>Situação</TableHead>
               <TableHead />
             </TableRow>
@@ -271,9 +293,16 @@ function ProductsPage() {
                 <TableCell className="text-muted-foreground">{p.category ?? "—"}</TableCell>
                 <TableCell className="text-right">{brl(Number(p.cost_price))}</TableCell>
                 <TableCell className="text-right font-medium">{brl(Number(p.price))}</TableCell>
-                <TableCell className="text-right">{p.stock}</TableCell>
+                <TableCell className="text-right">{brl(Number(p.wholesale_price))}</TableCell>
+                <TableCell className="text-right">
+                  <span className="font-medium">{p.available_stock}</span>
+                  {p.reserved_stock > 0 && (
+                    <p className="text-xs text-muted-foreground">{p.reserved_stock} reservado(s)</p>
+                  )}
+                </TableCell>
+                <TableCell className="text-right text-muted-foreground">{p.stock}</TableCell>
                 <TableCell>
-                  <StockBadge stock={p.stock} min={p.min_stock} />
+                  <StockBadge stock={p.available_stock} min={p.min_stock} />
                 </TableCell>
                 <TableCell className="text-right">
                   <Button variant="ghost" size="icon" onClick={() => openEdit(p)}>
@@ -289,7 +318,7 @@ function ProductsPage() {
             ))}
             {filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
                   Nenhum produto encontrado.
                 </TableCell>
               </TableRow>
