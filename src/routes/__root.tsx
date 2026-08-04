@@ -87,6 +87,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { property: "og:title", content: "Vieira Perfumes — Gestão de pedidos e entregas" },
+      { name: "twitter:title", content: "Vieira Perfumes — Gestão de pedidos e entregas" },
+      {
+        property: "og:description",
+        content: "Vendas de varejo e atacado, estoque, pedidos e entrega própria.",
+      },
+      {
+        name: "twitter:description",
+        content: "Vendas de varejo e atacado, estoque, pedidos e entrega própria.",
+      },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/c5fa9fdc-c164-48e4-9939-bed6bd344157/id-preview-fb395ecb--e4f69fa3-8d84-474d-9def-3c9d4739e1b7.lovable.app-1785515206711.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/c5fa9fdc-c164-48e4-9939-bed6bd344157/id-preview-fb395ecb--e4f69fa3-8d84-474d-9def-3c9d4739e1b7.lovable.app-1785515206711.png" },
     ],
     links: [
       {
