@@ -74,17 +74,12 @@ function SettingsPage() {
   const save = useMutation({
     mutationFn: async () => {
       if (!token.trim() && !status?.configured) throw new Error("Cole o token");
-      const payload: Record<string, unknown> = {
-        id: "meta_ads",
-        ad_account_id: account.trim() || status?.ad_account_id,
-        updated_at: new Date().toISOString(),
-      };
-      // token em branco quando já existe = manter o atual
-      if (token.trim()) payload.access_token = token.trim();
-
-      const { error } = await supabase
-        .from("integration_settings")
-        .upsert(payload, { onConflict: "id" });
+      // a gravação vai por função: ela confere o papel admin por dentro,
+      // então a tabela não precisa de política de escrita nenhuma
+      const { error } = await supabase.rpc("save_meta_settings", {
+        p_account: account.trim() || status?.ad_account_id || "",
+        p_token: token.trim() || "",
+      });
       if (error) throw error;
     },
     onSuccess: () => {
