@@ -158,7 +158,7 @@ function PdvPage() {
       const addr = counterSale ? "" : address.trim();
       const hood = counterSale ? "" : neighborhood.trim();
       const { data, error } = await supabase.rpc("create_order", {
-        ...(customerId === "none" ? {} : { p_customer: customerId }),
+        p_customer: (customerId === "none" ? null : customerId) as unknown as string,
         p_payment_method: payment,
         p_items: cart.map((i) => ({ product_id: i.productId, quantity: i.quantity })),
         ...(addr ? { p_address: addr } : {}),
