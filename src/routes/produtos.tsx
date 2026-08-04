@@ -114,7 +114,9 @@ function ProductsPage() {
         const { error } = await supabase.from("products").update(payload).eq("id", input.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("products").insert(payload);
+        const { error } = await supabase
+          .from("products")
+          .insert({ ...payload, wholesale_price: payload.price });
         if (error) throw error;
       }
     },
