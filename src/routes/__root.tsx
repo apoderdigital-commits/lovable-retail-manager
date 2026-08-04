@@ -80,13 +80,19 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Varejo360 — Gestão para lojas" },
+      { title: "Painel da loja — Varejo360" },
       {
         name: "description",
-        content: "Controle de estoque, PDV, clientes e relatórios para o seu varejo.",
+        content: "Faturamento do dia, alertas de estoque e últimas vendas da sua loja.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { property: "og:title", content: "Painel da loja — Varejo360" },
+      { name: "twitter:title", content: "Painel da loja — Varejo360" },
+      { property: "og:description", content: "Faturamento do dia, alertas de estoque e últimas vendas da sua loja." },
+      { name: "twitter:description", content: "Faturamento do dia, alertas de estoque e últimas vendas da sua loja." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/c5fa9fdc-c164-48e4-9939-bed6bd344157/id-preview-fb395ecb--e4f69fa3-8d84-474d-9def-3c9d4739e1b7.lovable.app-1785515206711.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/c5fa9fdc-c164-48e4-9939-bed6bd344157/id-preview-fb395ecb--e4f69fa3-8d84-474d-9def-3c9d4739e1b7.lovable.app-1785515206711.png" },
     ],
     links: [
       {
