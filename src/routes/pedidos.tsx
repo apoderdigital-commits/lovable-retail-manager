@@ -32,7 +32,7 @@ type Status = Database["public"]["Enums"]["order_status"];
 export const Route = createFileRoute("/pedidos")({
   head: () => ({
     meta: [
-      { title: "Pedidos — Varejo360" },
+      { title: "Pedidos — Vieira Perfumes" },
       {
         name: "description",
         content: "Acompanhe os pedidos por status, separe para entrega e cancele quando preciso.",

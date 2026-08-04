@@ -80,10 +80,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Varejo360 — Gestão para lojas" },
+      { title: "Vieira Perfumes — Gestão de pedidos e entregas" },
       {
         name: "description",
-        content: "Controle de estoque, PDV, clientes e relatórios para o seu varejo.",
+        content: "Vendas de varejo e atacado, estoque, pedidos e entrega própria.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

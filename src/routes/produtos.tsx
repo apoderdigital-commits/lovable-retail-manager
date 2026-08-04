@@ -31,12 +31,12 @@ import { brl } from "@/lib/format";
 export const Route = createFileRoute("/produtos")({
   head: () => ({
     meta: [
-      { title: "Produtos e estoque — Varejo360" },
+      { title: "Produtos e estoque — Vieira Perfumes" },
       {
         name: "description",
         content: "Cadastre produtos, defina preços e acompanhe o estoque mínimo da loja.",
       },
-      { property: "og:title", content: "Produtos e estoque — Varejo360" },
+      { property: "og:title", content: "Produtos e estoque — Vieira Perfumes" },
       {
         property: "og:description",
         content: "Cadastre produtos, defina preços e acompanhe o estoque mínimo da loja.",

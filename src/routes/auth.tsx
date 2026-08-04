@@ -14,12 +14,12 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Entrar — Varejo360" },
-      { name: "description", content: "Acesse o painel de gestão da sua loja no Varejo360." },
-      { property: "og:title", content: "Entrar — Varejo360" },
+      { title: "Entrar — Vieira Perfumes" },
+      { name: "description", content: "Acesse o painel de gestão da sua loja no Vieira Perfumes." },
+      { property: "og:title", content: "Entrar — Vieira Perfumes" },
       {
         property: "og:description",
-        content: "Acesse o painel de gestão da sua loja no Varejo360.",
+        content: "Acesse o painel de gestão da sua loja no Vieira Perfumes.",
       },
     ],
   }),
@@ -103,7 +103,7 @@ function AuthPage() {
           <span className="grid size-9 place-items-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
             <Store className="size-5" />
           </span>
-          <span className="font-display text-lg font-semibold">Varejo360</span>
+          <span className="font-display text-lg font-semibold">Vieira Perfumes</span>
         </div>
         <div className="max-w-sm">
           <h2 className="font-display text-3xl font-semibold leading-tight">

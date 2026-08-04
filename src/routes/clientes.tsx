@@ -31,12 +31,12 @@ import {
 export const Route = createFileRoute("/clientes")({
   head: () => ({
     meta: [
-      { title: "Clientes — Varejo360" },
+      { title: "Clientes — Vieira Perfumes" },
       {
         name: "description",
         content: "Cadastro de clientes da loja com contato, documento e observações.",
       },
-      { property: "og:title", content: "Clientes — Varejo360" },
+      { property: "og:title", content: "Clientes — Vieira Perfumes" },
       {
         property: "og:description",
         content: "Cadastro de clientes da loja com contato, documento e observações.",

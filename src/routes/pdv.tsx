@@ -21,12 +21,12 @@ import { brl } from "@/lib/format";
 export const Route = createFileRoute("/pdv")({
   head: () => ({
     meta: [
-      { title: "Nova venda (PDV) — Varejo360" },
+      { title: "Nova venda (PDV) — Vieira Perfumes" },
       {
         name: "description",
         content: "Registre vendas rapidamente, escolha a forma de pagamento e baixe o estoque.",
       },
-      { property: "og:title", content: "Nova venda (PDV) — Varejo360" },
+      { property: "og:title", content: "Nova venda (PDV) — Vieira Perfumes" },
       {
         property: "og:description",
         content: "Registre vendas rapidamente, escolha a forma de pagamento e baixe o estoque.",

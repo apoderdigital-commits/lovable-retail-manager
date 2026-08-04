@@ -9,12 +9,12 @@ import { brl, dateTime } from "@/lib/format";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Painel da loja — Varejo360" },
+      { title: "Painel da loja — Vieira Perfumes" },
       {
         name: "description",
         content: "Faturamento do dia, alertas de estoque e últimas vendas da sua loja.",
       },
-      { property: "og:title", content: "Painel da loja — Varejo360" },
+      { property: "og:title", content: "Painel da loja — Vieira Perfumes" },
       {
         property: "og:description",
         content: "Faturamento do dia, alertas de estoque e últimas vendas da sua loja.",

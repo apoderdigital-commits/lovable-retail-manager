@@ -57,7 +57,7 @@ export function AppShell({
           <span className="grid size-9 place-items-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
             <Store className="size-5" />
           </span>
-          <span className="font-display text-lg font-semibold">Varejo360</span>
+          <span className="font-display text-lg font-semibold">Vieira Perfumes</span>
         </div>
         <nav className="flex flex-1 flex-col gap-1">
           {nav.map((item) => {

@@ -15,12 +15,12 @@ import {
 export const Route = createFileRoute("/relatorios")({
   head: () => ({
     meta: [
-      { title: "Relatórios de vendas — Varejo360" },
+      { title: "Relatórios de vendas — Vieira Perfumes" },
       {
         name: "description",
         content: "Acompanhe faturamento, ticket médio, formas de pagamento e produtos campeões.",
       },
-      { property: "og:title", content: "Relatórios de vendas — Varejo360" },
+      { property: "og:title", content: "Relatórios de vendas — Vieira Perfumes" },
       {
         property: "og:description",
         content: "Acompanhe faturamento, ticket médio, formas de pagamento e produtos campeões.",
