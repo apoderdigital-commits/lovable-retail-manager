@@ -112,11 +112,11 @@ function PdvPage() {
 
   const add = (p: (typeof products)[number]) => {
     const inCart = cart.find((i) => i.productId === p.id)?.quantity ?? 0;
-    if (inCart >= p.available_stock) {
+    if (inCart >= (p.available_stock ?? 0)) {
       toast.error(
-        p.available_stock <= 0
+        (p.available_stock ?? 0) <= 0
           ? "Produto sem estoque disponível"
-          : `Só há ${p.available_stock} disponível(is)`,
+          : `Só há ${p.available_stock ?? 0} disponível(is)`,
       );
       return;
     }
@@ -207,7 +207,7 @@ function PdvPage() {
               <button
                 key={p.id}
                 onClick={() => add(p)}
-                disabled={p.available_stock <= 0}
+                disabled={(p.available_stock ?? 0) <= 0}
                 className="flex flex-col items-start rounded-lg border border-border bg-background p-3 text-left transition-colors hover:border-accent disabled:opacity-50"
               >
                 <span className="text-sm font-medium">{p.name}</span>
@@ -215,7 +215,7 @@ function PdvPage() {
                   {brl(priceOf(p))}
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  {p.available_stock} disponível(is)
+                  {p.available_stock ?? 0} disponível(is)
                   {p.reserved_stock > 0 && ` · ${p.reserved_stock} reservado(s)`}
                 </span>
               </button>

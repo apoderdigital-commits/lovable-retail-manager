@@ -12,7 +12,10 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ClientesRouteImport } from './routes/clientes'
+import { Route as EntregadorRouteImport } from './routes/entregador'
+import { Route as EntregasRouteImport } from './routes/entregas'
 import { Route as PdvRouteImport } from './routes/pdv'
+import { Route as PedidosRouteImport } from './routes/pedidos'
 import { Route as ProdutosRouteImport } from './routes/produtos'
 import { Route as RelatoriosRouteImport } from './routes/relatorios'
 
@@ -31,9 +34,24 @@ const ClientesRoute = ClientesRouteImport.update({
   path: '/clientes',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EntregadorRoute = EntregadorRouteImport.update({
+  id: '/entregador',
+  path: '/entregador',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EntregasRoute = EntregasRouteImport.update({
+  id: '/entregas',
+  path: '/entregas',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PdvRoute = PdvRouteImport.update({
   id: '/pdv',
   path: '/pdv',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PedidosRoute = PedidosRouteImport.update({
+  id: '/pedidos',
+  path: '/pedidos',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProdutosRoute = ProdutosRouteImport.update({
@@ -51,7 +69,10 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/clientes': typeof ClientesRoute
+  '/entregador': typeof EntregadorRoute
+  '/entregas': typeof EntregasRoute
   '/pdv': typeof PdvRoute
+  '/pedidos': typeof PedidosRoute
   '/produtos': typeof ProdutosRoute
   '/relatorios': typeof RelatoriosRoute
 }
@@ -59,7 +80,10 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/clientes': typeof ClientesRoute
+  '/entregador': typeof EntregadorRoute
+  '/entregas': typeof EntregasRoute
   '/pdv': typeof PdvRoute
+  '/pedidos': typeof PedidosRoute
   '/produtos': typeof ProdutosRoute
   '/relatorios': typeof RelatoriosRoute
 }
@@ -68,21 +92,45 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/clientes': typeof ClientesRoute
+  '/entregador': typeof EntregadorRoute
+  '/entregas': typeof EntregasRoute
   '/pdv': typeof PdvRoute
+  '/pedidos': typeof PedidosRoute
   '/produtos': typeof ProdutosRoute
   '/relatorios': typeof RelatoriosRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/clientes' | '/pdv' | '/produtos' | '/relatorios'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/clientes'
+    | '/entregador'
+    | '/entregas'
+    | '/pdv'
+    | '/pedidos'
+    | '/produtos'
+    | '/relatorios'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/clientes' | '/pdv' | '/produtos' | '/relatorios'
+  to:
+    | '/'
+    | '/auth'
+    | '/clientes'
+    | '/entregador'
+    | '/entregas'
+    | '/pdv'
+    | '/pedidos'
+    | '/produtos'
+    | '/relatorios'
   id:
     | '__root__'
     | '/'
     | '/auth'
     | '/clientes'
+    | '/entregador'
+    | '/entregas'
     | '/pdv'
+    | '/pedidos'
     | '/produtos'
     | '/relatorios'
   fileRoutesById: FileRoutesById
@@ -91,7 +139,10 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
   ClientesRoute: typeof ClientesRoute
+  EntregadorRoute: typeof EntregadorRoute
+  EntregasRoute: typeof EntregasRoute
   PdvRoute: typeof PdvRoute
+  PedidosRoute: typeof PedidosRoute
   ProdutosRoute: typeof ProdutosRoute
   RelatoriosRoute: typeof RelatoriosRoute
 }
@@ -119,11 +170,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ClientesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/entregador': {
+      id: '/entregador'
+      path: '/entregador'
+      fullPath: '/entregador'
+      preLoaderRoute: typeof EntregadorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/entregas': {
+      id: '/entregas'
+      path: '/entregas'
+      fullPath: '/entregas'
+      preLoaderRoute: typeof EntregasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/pdv': {
       id: '/pdv'
       path: '/pdv'
       fullPath: '/pdv'
       preLoaderRoute: typeof PdvRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pedidos': {
+      id: '/pedidos'
+      path: '/pedidos'
+      fullPath: '/pedidos'
+      preLoaderRoute: typeof PedidosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/produtos': {
@@ -147,7 +219,10 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
   ClientesRoute: ClientesRoute,
+  EntregadorRoute: EntregadorRoute,
+  EntregasRoute: EntregasRoute,
   PdvRoute: PdvRoute,
+  PedidosRoute: PedidosRoute,
   ProdutosRoute: ProdutosRoute,
   RelatoriosRoute: RelatoriosRoute,
 }

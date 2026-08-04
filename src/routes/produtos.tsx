@@ -295,14 +295,14 @@ function ProductsPage() {
                 <TableCell className="text-right font-medium">{brl(Number(p.price))}</TableCell>
                 <TableCell className="text-right">{brl(Number(p.wholesale_price))}</TableCell>
                 <TableCell className="text-right">
-                  <span className="font-medium">{p.available_stock}</span>
+                  <span className="font-medium">{p.available_stock ?? 0}</span>
                   {p.reserved_stock > 0 && (
                     <p className="text-xs text-muted-foreground">{p.reserved_stock} reservado(s)</p>
                   )}
                 </TableCell>
                 <TableCell className="text-right text-muted-foreground">{p.stock}</TableCell>
                 <TableCell>
-                  <StockBadge stock={p.available_stock} min={p.min_stock} />
+                  <StockBadge stock={p.available_stock ?? 0} min={p.min_stock} />
                 </TableCell>
                 <TableCell className="text-right">
                   <Button variant="ghost" size="icon" onClick={() => openEdit(p)}>

@@ -56,10 +56,28 @@ export type Database = {
         }
         Relationships: []
       }
+      delivery_fees: {
+        Row: {
+          amount: number
+          id: string
+          neighborhood: string
+        }
+        Insert: {
+          amount: number
+          id?: string
+          neighborhood: string
+        }
+        Update: {
+          amount?: number
+          id?: string
+          neighborhood?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           active: boolean
-          available_stock: number
+          available_stock: number | null
           category: string | null
           cost_price: number
           created_at: string
@@ -75,6 +93,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          available_stock?: number | null
           category?: string | null
           cost_price?: number
           created_at?: string
@@ -90,6 +109,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          available_stock?: number | null
           category?: string | null
           cost_price?: number
           created_at?: string
@@ -126,6 +146,33 @@ export type Database = {
           full_name?: string | null
           id?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      routes: {
+        Row: {
+          closed_at: string | null
+          courier_id: string
+          created_at: string
+          date: string
+          dispatched_at: string | null
+          id: string
+        }
+        Insert: {
+          closed_at?: string | null
+          courier_id: string
+          created_at?: string
+          date?: string
+          dispatched_at?: string | null
+          id?: string
+        }
+        Update: {
+          closed_at?: string | null
+          courier_id?: string
+          created_at?: string
+          date?: string
+          dispatched_at?: string | null
+          id?: string
         }
         Relationships: []
       }
@@ -170,6 +217,47 @@ export type Database = {
           },
           {
             foreignKeyName: "sale_items_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sale_status_history: {
+        Row: {
+          attachment_url: string | null
+          created_at: string
+          from_status: Database["public"]["Enums"]["order_status"] | null
+          id: number
+          reason: string | null
+          sale_id: string
+          to_status: Database["public"]["Enums"]["order_status"]
+          user_id: string | null
+        }
+        Insert: {
+          attachment_url?: string | null
+          created_at?: string
+          from_status?: Database["public"]["Enums"]["order_status"] | null
+          id?: never
+          reason?: string | null
+          sale_id: string
+          to_status: Database["public"]["Enums"]["order_status"]
+          user_id?: string | null
+        }
+        Update: {
+          attachment_url?: string | null
+          created_at?: string
+          from_status?: Database["public"]["Enums"]["order_status"] | null
+          id?: never
+          reason?: string | null
+          sale_id?: string
+          to_status?: Database["public"]["Enums"]["order_status"]
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sale_status_history_sale_id_fkey"
             columns: ["sale_id"]
             isOneToOne: false
             referencedRelation: "sales"
@@ -261,92 +349,6 @@ export type Database = {
           },
         ]
       }
-      routes: {
-        Row: {
-          closed_at: string | null
-          courier_id: string
-          created_at: string
-          date: string
-          dispatched_at: string | null
-          id: string
-        }
-        Insert: {
-          closed_at?: string | null
-          courier_id: string
-          created_at?: string
-          date?: string
-          dispatched_at?: string | null
-          id?: string
-        }
-        Update: {
-          closed_at?: string | null
-          courier_id?: string
-          created_at?: string
-          date?: string
-          dispatched_at?: string | null
-          id?: string
-        }
-        Relationships: []
-      }
-      delivery_fees: {
-        Row: {
-          amount: number
-          id: string
-          neighborhood: string
-        }
-        Insert: {
-          amount: number
-          id?: string
-          neighborhood: string
-        }
-        Update: {
-          amount?: number
-          id?: string
-          neighborhood?: string
-        }
-        Relationships: []
-      }
-      sale_status_history: {
-        Row: {
-          attachment_url: string | null
-          created_at: string
-          from_status: Database["public"]["Enums"]["order_status"] | null
-          id: number
-          reason: string | null
-          sale_id: string
-          to_status: Database["public"]["Enums"]["order_status"]
-          user_id: string | null
-        }
-        Insert: {
-          attachment_url?: string | null
-          created_at?: string
-          from_status?: Database["public"]["Enums"]["order_status"] | null
-          id?: number
-          reason?: string | null
-          sale_id: string
-          to_status: Database["public"]["Enums"]["order_status"]
-          user_id?: string | null
-        }
-        Update: {
-          attachment_url?: string | null
-          created_at?: string
-          from_status?: Database["public"]["Enums"]["order_status"] | null
-          id?: number
-          reason?: string | null
-          sale_id?: string
-          to_status?: Database["public"]["Enums"]["order_status"]
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "sale_status_history_sale_id_fkey"
-            columns: ["sale_id"]
-            isOneToOne: false
-            referencedRelation: "sales"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       stock_movements: {
         Row: {
           created_at: string
@@ -360,7 +362,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          id?: number
+          id?: never
           kind: Database["public"]["Enums"]["stock_move"]
           note?: string | null
           product_id: string
@@ -370,7 +372,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          id?: number
+          id?: never
           kind?: Database["public"]["Enums"]["stock_move"]
           note?: string | null
           product_id?: string
@@ -421,30 +423,51 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      close_route: {
-        Args: { p_route: string }
-        Returns: Json
-      }
+      close_route: { Args: { p_route: string }; Returns: Json }
       create_order: {
         Args: {
-          p_address?: string | null
+          p_address?: string
           p_counter_sale?: boolean
-          p_customer: string | null
+          p_customer: string
           p_discount?: number
           p_items: Json
-          p_neighborhood?: string | null
+          p_neighborhood?: string
           p_payment_method: string
         }
-        Returns: Database["public"]["Tables"]["sales"]["Row"]
+        Returns: {
+          courier_id: string | null
+          created_at: string
+          customer_id: string | null
+          delivery_address: string | null
+          delivery_fee: number
+          discount: number
+          fee_due: boolean
+          id: string
+          neighborhood: string | null
+          payment_method: string
+          proof_url: string | null
+          reason: string | null
+          route_id: string | null
+          sale_number: number
+          scheduled_for: string | null
+          seller_id: string | null
+          status: Database["public"]["Enums"]["order_status"]
+          subtotal: number
+          total: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "sales"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       current_has_role: {
         Args: { _role: Database["public"]["Enums"]["app_role"] }
         Returns: boolean
       }
-      dispatch_route: {
-        Args: { p_route: string }
-        Returns: number
-      }
+      dispatch_route: { Args: { p_route: string }; Returns: number }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -452,23 +475,44 @@ export type Database = {
         }
         Returns: boolean
       }
-      is_courier: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      is_staff: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
+      is_courier: { Args: never; Returns: boolean }
+      is_staff: { Args: never; Returns: boolean }
       transition_sale: {
         Args: {
-          p_proof?: string | null
-          p_reason?: string | null
+          p_proof?: string
+          p_reason?: string
           p_sale: string
-          p_schedule?: string | null
+          p_schedule?: string
           p_to: Database["public"]["Enums"]["order_status"]
         }
-        Returns: Database["public"]["Tables"]["sales"]["Row"]
+        Returns: {
+          courier_id: string | null
+          created_at: string
+          customer_id: string | null
+          delivery_address: string | null
+          delivery_fee: number
+          discount: number
+          fee_due: boolean
+          id: string
+          neighborhood: string | null
+          payment_method: string
+          proof_url: string | null
+          reason: string | null
+          route_id: string | null
+          sale_number: number
+          scheduled_for: string | null
+          seller_id: string | null
+          status: Database["public"]["Enums"]["order_status"]
+          subtotal: number
+          total: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "sales"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
     }
     Enums: {
@@ -482,12 +526,7 @@ export type Database = {
         | "scheduled"
         | "not_delivered"
         | "cancelled"
-      stock_move:
-        | "inbound"
-        | "adjustment"
-        | "reserve"
-        | "release"
-        | "writeoff"
+      stock_move: "inbound" | "adjustment" | "reserve" | "release" | "writeoff"
     }
     CompositeTypes: {
       [_ in never]: never
