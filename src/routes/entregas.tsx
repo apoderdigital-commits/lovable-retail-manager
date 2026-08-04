@@ -56,10 +56,16 @@ function DeliveriesPage() {
     },
   });
 
+  // rotas de hoje mais qualquer uma ainda aberta de dias anteriores,
+  // para não sumir com rota esquecida na virada
   const { data: routes = [] } = useQuery({
     queryKey: ["routes", today],
     queryFn: async () => {
-      const { data, error } = await supabase.from("routes").select("*").eq("date", today);
+      const { data, error } = await supabase
+        .from("routes")
+        .select("*")
+        .or(`date.eq.${today},closed_at.is.null`)
+        .order("created_at");
       if (error) throw error;
       return data;
     },
@@ -80,7 +86,7 @@ function DeliveriesPage() {
       const { data, error } = await supabase
         .from("sales")
         .select("*, customers(name, customer_type)")
-        .in("status", ["picked", "scheduled"])
+        .in("status", ["picked", "scheduled", "on_route"])
         .order("created_at");
       if (error) throw error;
       return data;
@@ -103,17 +109,15 @@ function DeliveriesPage() {
 
   const assign = useMutation({
     mutationFn: async ({ saleId, courierId }: { saleId: string; courierId: string }) => {
-      // a rota do dia do entregador é criada na primeira atribuição
-      const { data: route, error } = await supabase
-        .from("routes")
-        .upsert({ courier_id: courierId, date: today }, { onConflict: "courier_id,date" })
-        .select()
-        .single();
+      // a função devolve a rota em montagem do entregador, criando se
+      // não houver. no banco para não haver corrida entre atendentes.
+      const { data: routeId, error } = await supabase.rpc("open_route_for", {
+        p_courier: courierId,
+      });
       if (error) throw error;
-      if (route.dispatched_at) throw new Error("Rota já despachada. Crie o pedido na próxima.");
       const { error: e2 } = await supabase
         .from("sales")
-        .update({ route_id: route.id })
+        .update({ route_id: routeId })
         .eq("id", saleId);
       if (e2) throw e2;
     },
@@ -176,6 +180,8 @@ function DeliveriesPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const stopsOf = (routeId: string) => orders.filter((o) => o.route_id === routeId);
+
   return (
     <AppShell
       title="Entregas"
@@ -187,8 +193,7 @@ function DeliveriesPage() {
     >
       {couriers.length === 0 && (
         <div className="panel mb-4 p-4 text-sm text-muted-foreground">
-          Nenhum entregador cadastrado. Um usuário vira entregador ao receber o papel{" "}
-          <code className="rounded bg-muted px-1">courier</code> em <code>user_roles</code>.
+          Nenhum entregador cadastrado. Crie o acesso em Usuários com o papel Entregador.
         </div>
       )}
 
@@ -263,13 +268,14 @@ function DeliveriesPage() {
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {couriers.map((c) => {
-            const route = routes.find((r) => r.courier_id === c.id);
-            const stops = route ? orders.filter((o) => o.route_id === route.id) : [];
-            const cash = stops
+            const mine = routes.filter((r) => r.courier_id === c.id);
+            const open = mine.find((r) => !r.dispatched_at) ?? null;
+            const running = mine.filter((r) => r.dispatched_at && !r.closed_at);
+            const openStops = open ? stopsOf(open.id) : [];
+            const cash = openStops
               .filter((o) => o.payment_method === "dinheiro")
               .reduce((s, o) => s + Number(o.total), 0);
-            const fee = stops.reduce((s, o) => s + feeOf(o.neighborhood), 0);
-            const dispatched = !!route?.dispatched_at;
+            const fee = openStops.reduce((s, o) => s + feeOf(o.neighborhood), 0);
 
             return (
               <section key={c.id} className="panel flex flex-col">
@@ -277,19 +283,19 @@ function DeliveriesPage() {
                   <div className="flex items-center gap-2">
                     <Bike className="size-4 text-muted-foreground" />
                     <span className="text-sm font-semibold">{c.full_name || c.email}</span>
-                    {dispatched && (
-                      <Badge className="ml-auto border-transparent bg-primary text-primary-foreground text-[10px]">
-                        em rota
+                    {running.length > 0 && (
+                      <Badge className="ml-auto border-transparent bg-primary text-[10px] text-primary-foreground">
+                        {running.length} na rua
                       </Badge>
                     )}
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {stops.length} parada(s) · espécie {brl(cash)} · taxa {brl(fee)}
+                    {openStops.length} em montagem · espécie {brl(cash)} · taxa {brl(fee)}
                   </p>
                 </header>
 
                 <div className="flex-1 space-y-1.5 p-3">
-                  {stops.map((o, idx) => (
+                  {openStops.map((o, idx) => (
                     <div
                       key={o.id}
                       className="flex items-center gap-2 rounded-md border border-border bg-background px-2.5 py-2"
@@ -301,71 +307,82 @@ function DeliveriesPage() {
                           {o.neighborhood ?? "sem bairro"}
                         </p>
                       </div>
-                      {!dispatched && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-7"
-                          onClick={() => unassign.mutate(o.id)}
-                        >
-                          <Undo2 className="size-3.5" />
-                        </Button>
-                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-7"
+                        onClick={() => unassign.mutate(o.id)}
+                      >
+                        <Undo2 className="size-3.5" />
+                      </Button>
                     </div>
                   ))}
-                  {stops.length === 0 && (
+                  {openStops.length === 0 && (
                     <p className="py-6 text-center text-xs text-muted-foreground">
-                      Atribua pedidos da fila.
+                      Atribua pedidos da fila para montar a próxima saída.
                     </p>
                   )}
                 </div>
 
-                <div className="border-t border-border p-3">
-                  {!dispatched ? (
-                    <Button
-                      className="w-full"
-                      size="sm"
-                      disabled={stops.length === 0 || dispatch.isPending}
-                      onClick={() => route && dispatch.mutate(route.id)}
-                    >
-                      <Send className="mr-1.5 size-3.5" /> Despachar rota
-                    </Button>
-                  ) : closing === route?.id ? (
-                    <div className="space-y-1.5">
-                      <p className="text-xs text-muted-foreground">
-                        Encerrar fecha o acerto do dia. Paradas não concluídas ficam como estão.
-                      </p>
-                      <div className="flex gap-1.5">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="flex-1"
-                          onClick={() => setClosing(null)}
-                        >
-                          Voltar
-                        </Button>
-                        <Button
-                          size="sm"
-                          className="flex-1"
-                          disabled={close.isPending}
-                          onClick={() => close.mutate(route.id)}
-                        >
-                          Confirmar
-                        </Button>
+                <div className="space-y-2 border-t border-border p-3">
+                  <Button
+                    className="w-full"
+                    size="sm"
+                    disabled={!open || openStops.length === 0 || dispatch.isPending}
+                    onClick={() => open && dispatch.mutate(open.id)}
+                  >
+                    <Send className="mr-1.5 size-3.5" /> Despachar saída
+                  </Button>
+
+                  {running.map((r) => {
+                    const n = stopsOf(r.id).length;
+                    const hora = r.dispatched_at
+                      ? new Date(r.dispatched_at).toLocaleTimeString("pt-BR", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                      : "";
+                    return closing === r.id ? (
+                      <div key={r.id} className="space-y-1.5 rounded-md bg-muted/50 p-2">
+                        <p className="text-xs text-muted-foreground">
+                          Encerra o acerto desta saída. Paradas não concluídas ficam como estão.
+                        </p>
+                        <div className="flex gap-1.5">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="flex-1"
+                            onClick={() => setClosing(null)}
+                          >
+                            Voltar
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="flex-1"
+                            disabled={close.isPending}
+                            onClick={() => close.mutate(r.id)}
+                          >
+                            Confirmar
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      size="sm"
-                      disabled={!!route?.closed_at}
-                      onClick={() => route && setClosing(route.id)}
-                    >
-                      <Flag className="mr-1.5 size-3.5" />
-                      {route?.closed_at ? "Rota encerrada" : "Encerrar rota"}
-                    </Button>
-                  )}
+                    ) : (
+                      <Button
+                        key={r.id}
+                        variant="outline"
+                        className="w-full justify-between"
+                        size="sm"
+                        onClick={() => setClosing(r.id)}
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <Flag className="size-3.5" /> Encerrar saída das {hora}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {n} parada{n === 1 ? "" : "s"}
+                        </span>
+                      </Button>
+                    );
+                  })}
                 </div>
               </section>
             );

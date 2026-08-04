@@ -51,7 +51,7 @@ const todayISO = () => new Date().toLocaleDateString("sv-SE");
 function CourierPage() {
   const { user, isAdmin } = useAuth();
   const qc = useQueryClient();
-  const today = todayISO();
+
   const [viewing, setViewing] = useState<string | null>(null);
 
   // admin acompanha a rota de qualquer entregador; entregador vê só a dele
@@ -90,17 +90,19 @@ function CourierPage() {
     },
   });
 
-  const { data: route } = useQuery({
-    queryKey: ["my-route-header", courierId, today],
+  // o entregador pode ter mais de uma saída aberta no mesmo dia
+  const { data: openRoutes = [] } = useQuery({
+    queryKey: ["my-route-header", courierId],
     enabled: !!courierId,
     queryFn: async () => {
       const { data } = await supabase
         .from("routes")
         .select("*")
         .eq("courier_id", courierId)
-        .eq("date", today)
-        .maybeSingle();
-      return data;
+        .not("dispatched_at", "is", null)
+        .is("closed_at", null)
+        .order("dispatched_at");
+      return data ?? [];
     },
   });
 
@@ -112,9 +114,8 @@ function CourierPage() {
   };
 
   const close = useMutation({
-    mutationFn: async () => {
-      if (!route) throw new Error("Nenhuma rota aberta hoje");
-      const { data, error } = await supabase.rpc("close_route", { p_route: route.id });
+    mutationFn: async (routeId: string) => {
+      const { data, error } = await supabase.rpc("close_route", { p_route: routeId });
       if (error) throw error;
       return data as Record<string, number>;
     },
@@ -169,17 +170,25 @@ function CourierPage() {
           <StopCard key={s.id} stop={s} index={idx + 1} onDone={refresh} />
         ))}
 
-        {route && !route.closed_at && route.dispatched_at && (
+        {openRoutes.map((r) => (
           <Button
+            key={r.id}
             variant="outline"
             className="w-full"
             size="lg"
             disabled={close.isPending}
-            onClick={() => close.mutate()}
+            onClick={() => close.mutate(r.id)}
           >
-            <Flag className="mr-2 size-4" /> Encerrar rota
+            <Flag className="mr-2 size-4" />
+            Encerrar saída
+            {openRoutes.length > 1 && r.dispatched_at
+              ? ` das ${new Date(r.dispatched_at).toLocaleTimeString("pt-BR", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}`
+              : ""}
           </Button>
-        )}
+        ))}
       </div>
     </AppShell>
   );
