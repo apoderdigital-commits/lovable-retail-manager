@@ -12,6 +12,8 @@ import {
   Truck,
   Bike,
   ShieldCheck,
+  Megaphone,
+  Settings,
 } from "lucide-react";
 import { useAuth, ROLE_LABEL } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -26,7 +28,9 @@ const nav = [
   { to: "/produtos", label: "Produtos", icon: Package, access: "staff" },
   { to: "/clientes", label: "Clientes", icon: Users, access: "staff" },
   { to: "/relatorios", label: "Relatórios", icon: BarChart3, access: "staff" },
+  { to: "/marketing", label: "Marketing", icon: Megaphone, access: "staff" },
   { to: "/usuarios", label: "Usuários", icon: ShieldCheck, access: "admin" },
+  { to: "/configuracoes", label: "Configurações", icon: Settings, access: "admin" },
 ] as const;
 
 // a única rota que um entregador puro alcança
