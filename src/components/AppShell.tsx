@@ -9,6 +9,7 @@ import {
   LogOut,
   Store,
   Receipt,
+  Truck,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ const nav = [
   { to: "/", label: "Painel", icon: LayoutDashboard },
   { to: "/pdv", label: "Nova venda", icon: ShoppingCart },
   { to: "/pedidos", label: "Pedidos", icon: Receipt },
+  { to: "/entregas", label: "Entregas", icon: Truck },
   { to: "/produtos", label: "Produtos", icon: Package },
   { to: "/clientes", label: "Clientes", icon: Users },
   { to: "/relatorios", label: "Relatórios", icon: BarChart3 },
