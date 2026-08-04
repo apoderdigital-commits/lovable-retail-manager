@@ -143,6 +143,10 @@ function CourierPage() {
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["my-route"] });
+    // sem isto o painel do topo não mexe ao confirmar entrega, que é
+    // exatamente quando o entregador olha para ele
+    qc.invalidateQueries({ queryKey: ["my-summary"] });
+    qc.invalidateQueries({ queryKey: ["route-summary"] });
     qc.invalidateQueries({ queryKey: ["dispatch"] });
     qc.invalidateQueries({ queryKey: ["orders"] });
     qc.invalidateQueries({ queryKey: ["products"] });
