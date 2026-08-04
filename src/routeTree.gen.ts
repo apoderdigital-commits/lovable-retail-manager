@@ -17,6 +17,7 @@ import { Route as EntregadorRouteImport } from './routes/entregador'
 import { Route as EntregasRouteImport } from './routes/entregas'
 import { Route as MarketingRouteImport } from './routes/marketing'
 import { Route as FinanceiroRouteImport } from './routes/financeiro'
+import { Route as CustosRouteImport } from './routes/custos'
 import { Route as PdvRouteImport } from './routes/pdv'
 import { Route as PedidosRouteImport } from './routes/pedidos'
 import { Route as ProdutosRouteImport } from './routes/produtos'
@@ -93,6 +94,7 @@ export interface FileRoutesByFullPath {
   '/entregas': typeof EntregasRoute
   '/marketing': typeof MarketingRoute
   '/financeiro': typeof FinanceiroRoute
+  '/custos': typeof CustosRoute
   '/pdv': typeof PdvRoute
   '/pedidos': typeof PedidosRoute
   '/produtos': typeof ProdutosRoute
@@ -108,6 +110,7 @@ export interface FileRoutesByTo {
   '/entregas': typeof EntregasRoute
   '/marketing': typeof MarketingRoute
   '/financeiro': typeof FinanceiroRoute
+  '/custos': typeof CustosRoute
   '/pdv': typeof PdvRoute
   '/pedidos': typeof PedidosRoute
   '/produtos': typeof ProdutosRoute
@@ -124,6 +127,7 @@ export interface FileRoutesById {
   '/entregas': typeof EntregasRoute
   '/marketing': typeof MarketingRoute
   '/financeiro': typeof FinanceiroRoute
+  '/custos': typeof CustosRoute
   '/pdv': typeof PdvRoute
   '/pedidos': typeof PedidosRoute
   '/produtos': typeof ProdutosRoute
@@ -141,6 +145,7 @@ export interface FileRouteTypes {
     | '/entregas'
     | '/marketing'
     | '/financeiro'
+    | '/custos'
     | '/pdv'
     | '/pedidos'
     | '/produtos'
@@ -156,6 +161,7 @@ export interface FileRouteTypes {
     | '/entregas'
     | '/marketing'
     | '/financeiro'
+    | '/custos'
     | '/pdv'
     | '/pedidos'
     | '/produtos'
@@ -171,6 +177,7 @@ export interface FileRouteTypes {
     | '/entregas'
     | '/marketing'
     | '/financeiro'
+    | '/custos'
     | '/pdv'
     | '/pedidos'
     | '/produtos'
@@ -187,6 +194,7 @@ export interface RootRouteChildren {
   EntregasRoute: typeof EntregasRoute
   MarketingRoute: typeof MarketingRoute
   FinanceiroRoute: typeof FinanceiroRoute
+  CustosRoute: typeof CustosRoute
   PdvRoute: typeof PdvRoute
   PedidosRoute: typeof PedidosRoute
   ProdutosRoute: typeof ProdutosRoute
@@ -292,6 +300,7 @@ const rootRouteChildren: RootRouteChildren = {
   EntregasRoute: EntregasRoute,
   MarketingRoute: MarketingRoute,
   FinanceiroRoute: FinanceiroRoute,
+  CustosRoute: CustosRoute,
   PdvRoute: PdvRoute,
   PedidosRoute: PedidosRoute,
   ProdutosRoute: ProdutosRoute,

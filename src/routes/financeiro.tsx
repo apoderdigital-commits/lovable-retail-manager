@@ -1,8 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Plus, Trash2, Wallet, SlidersHorizontal } from "lucide-react";
-import { toast } from "sonner";
+import { Wallet, SlidersHorizontal } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
 import { useAuth } from "@/hooks/useAuth";
@@ -100,6 +99,15 @@ function FinancePage() {
     <AppShell
       title="Financeiro"
       subtitle={s ? `${s.pedidos} pedido(s) entregue(s) no período` : "Carregando..."}
+      actions={
+        isAdmin ? (
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/custos">
+              <SlidersHorizontal className="mr-1.5 size-3.5" /> Configurar custos
+            </Link>
+          </Button>
+        ) : null
+      }
     >
       <div className="mb-4 flex flex-wrap items-end gap-3">
         <div className="space-y-1.5">
@@ -209,7 +217,6 @@ function FinancePage() {
         </Table>
       </div>
 
-      {isAdmin && <CostSettings />}
     </AppShell>
   );
 }
@@ -238,208 +245,3 @@ function Line({
   );
 }
 
-function CostSettings() {
-  const qc = useQueryClient();
-  const [novo, setNovo] = useState({ name: "", monthly_amount: "" });
-
-  const { data: offers = [] } = useQuery({
-    queryKey: ["offers"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("offers").select("*").order("item_count");
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: costs = [] } = useQuery({
-    queryKey: ["offer-costs"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("offer_costs").select("*");
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: fixed = [] } = useQuery({
-    queryKey: ["fixed-costs"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("fixed_costs")
-        .select("*")
-        .eq("active", true)
-        .order("created_at");
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const saveKit = useMutation({
-    mutationFn: async ({ offerId, value }: { offerId: string; value: number }) => {
-      const { error } = await supabase
-        .from("offer_costs")
-        .upsert(
-          { offer_id: offerId, kit_cost: value, updated_at: new Date().toISOString() },
-          { onConflict: "offer_id" },
-        );
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Custo salvo");
-      qc.invalidateQueries({ queryKey: ["offer-costs"] });
-      qc.invalidateQueries({ queryKey: ["finance"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const addFixed = useMutation({
-    mutationFn: async () => {
-      const value = Number(novo.monthly_amount || 0);
-      if (!novo.name.trim()) throw new Error("Dê um nome ao custo");
-      const { error } = await supabase
-        .from("fixed_costs")
-        .insert({ name: novo.name.trim(), monthly_amount: value });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      setNovo({ name: "", monthly_amount: "" });
-      qc.invalidateQueries({ queryKey: ["fixed-costs"] });
-      qc.invalidateQueries({ queryKey: ["finance"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const updateFixed = useMutation({
-    mutationFn: async ({ id, value }: { id: string; value: number }) => {
-      const { error } = await supabase
-        .from("fixed_costs")
-        .update({ monthly_amount: value })
-        .eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Custo atualizado");
-      qc.invalidateQueries({ queryKey: ["fixed-costs"] });
-      qc.invalidateQueries({ queryKey: ["finance"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const removeFixed = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("fixed_costs").update({ active: false }).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["fixed-costs"] });
-      qc.invalidateQueries({ queryKey: ["finance"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const kitOf = (offerId: string) =>
-    costs.find((c) => c.offer_id === offerId)?.kit_cost ?? "";
-
-  return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <section className="panel p-4">
-        <div className="mb-3 flex items-center gap-2">
-          <SlidersHorizontal className="size-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold">Custo por oferta</h2>
-        </div>
-        <p className="mb-3 text-xs text-muted-foreground">
-          Quanto custa montar um kit inteiro, não por perfume. Venda avulsa não usa este campo — ela
-          calcula pelo preço de custo de cada produto no cadastro.
-        </p>
-        <div className="space-y-3">
-          {offers.map((o) => (
-            <div key={o.id} className="flex items-end gap-2">
-              <div className="flex-1 space-y-1.5">
-                <Label className="text-xs">{o.name}</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  defaultValue={kitOf(o.id)}
-                  placeholder="0,00"
-                  onBlur={(e) => {
-                    const v = Number(e.target.value || 0);
-                    if (v !== Number(kitOf(o.id) || 0)) saveKit.mutate({ offerId: o.id, value: v });
-                  }}
-                />
-              </div>
-              <p className="pb-2.5 text-xs text-muted-foreground">
-                vende por {brl(Number(o.price))}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="panel p-4">
-        <div className="mb-3 flex items-center gap-2">
-          <Wallet className="size-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold">Custos fixos mensais</h2>
-        </div>
-        <p className="mb-3 text-xs text-muted-foreground">
-          Folha, aluguel, contador. O valor é rateado por dia no período consultado.
-        </p>
-
-        <div className="space-y-2">
-          {fixed.map((f) => (
-            <div key={f.id} className="flex items-end gap-2">
-              <div className="flex-1 space-y-1.5">
-                <Label className="text-xs">{f.name}</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  defaultValue={f.monthly_amount}
-                  onBlur={(e) => {
-                    const v = Number(e.target.value || 0);
-                    if (v !== Number(f.monthly_amount)) updateFixed.mutate({ id: f.id, value: v });
-                  }}
-                />
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="mb-0.5"
-                onClick={() => removeFixed.mutate(f.id)}
-              >
-                <Trash2 className="size-4 text-destructive" />
-              </Button>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-4 flex items-end gap-2 border-t border-border pt-3">
-          <div className="flex-1 space-y-1.5">
-            <Label className="text-xs">Novo custo</Label>
-            <Input
-              placeholder="Aluguel"
-              value={novo.name}
-              onChange={(e) => setNovo({ ...novo, name: e.target.value })}
-            />
-          </div>
-          <div className="w-28 space-y-1.5">
-            <Label className="text-xs">Mensal</Label>
-            <Input
-              type="number"
-              step="0.01"
-              placeholder="0,00"
-              value={novo.monthly_amount}
-              onChange={(e) => setNovo({ ...novo, monthly_amount: e.target.value })}
-            />
-          </div>
-          <Button
-            variant="outline"
-            size="icon"
-            className="mb-0.5"
-            disabled={addFixed.isPending}
-            onClick={() => addFixed.mutate()}
-          >
-            <Plus className="size-4" />
-          </Button>
-        </div>
-      </section>
-    </div>
-  );
-}
