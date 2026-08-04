@@ -19,6 +19,7 @@ import {
 import { useAuth, ROLE_LABEL } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import logoAsset from "@/assets/logo-vieira.png.asset.json";
 
 const nav = [
   { to: "/", label: "Painel", icon: LayoutDashboard, access: "staff" },
@@ -57,7 +58,7 @@ export function Logo({ size = "size-9" }: { size?: string }) {
 
   return (
     <img
-      src="/logo-vieira.png"
+      src={logoAsset.url}
       alt="Vieira Perfumes"
       className={`${size} shrink-0 rounded-lg object-contain`}
       onError={() => setBroken(true)}
