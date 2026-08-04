@@ -96,7 +96,7 @@ function OrdersPage() {
       const { error } = await supabase.rpc("transition_sale", {
         p_sale: input.id,
         p_to: input.to,
-        p_reason: input.reason ?? null,
+        ...(input.reason ? { p_reason: input.reason } : {}),
       });
       if (error) throw error;
     },
