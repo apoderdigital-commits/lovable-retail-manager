@@ -11,6 +11,7 @@ import {
   Receipt,
   Truck,
   Bike,
+  ShieldCheck,
 } from "lucide-react";
 import { useAuth, ROLE_LABEL } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ const nav = [
   { to: "/produtos", label: "Produtos", icon: Package, access: "staff" },
   { to: "/clientes", label: "Clientes", icon: Users, access: "staff" },
   { to: "/relatorios", label: "Relatórios", icon: BarChart3, access: "staff" },
+  { to: "/usuarios", label: "Usuários", icon: ShieldCheck, access: "admin" },
 ] as const;
 
 // a única rota que um entregador puro alcança
@@ -82,7 +84,9 @@ export function AppShell({
     );
   }
 
-  const visible = nav.filter((i) => (i.access === "staff" ? isStaff : isCourier || isAdmin));
+  const visible = nav.filter((i) =>
+    i.access === "admin" ? isAdmin : i.access === "staff" ? isStaff : isCourier || isAdmin,
+  );
 
   return (
     <div className="flex min-h-screen w-full bg-background">
