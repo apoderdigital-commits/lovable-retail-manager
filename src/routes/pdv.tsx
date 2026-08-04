@@ -47,6 +47,8 @@ function PdvPage() {
   // guarda só id e quantidade: o preço é derivado do tipo do cliente,
   // então trocar o cliente reprecifica o carrinho inteiro sozinho
   const [cart, setCart] = useState<{ productId: string; quantity: number }[]>([]);
+  // null = venda avulsa (orgânica). com oferta = veio de campanha.
+  const [offerId, setOfferId] = useState<string | null>(null);
   const [customerId, setCustomerId] = useState("none");
   const [payment, setPayment] = useState("dinheiro");
   const [discount, setDiscount] = useState("0");
@@ -78,11 +80,28 @@ function PdvPage() {
     },
   });
 
+  const { data: offers = [] } = useQuery({
+    queryKey: ["offers"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("offers")
+        .select("*")
+        .eq("active", true)
+        .order("item_count");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const customer = customers.find((c) => c.id === customerId) ?? null;
   const isWholesale = customer?.customer_type === "wholesale";
+  const offer = offers.find((o) => o.id === offerId) ?? null;
 
+  // dentro da oferta cada slot vale o mesmo; fora dela vale a tabela do cliente
   const priceOf = (p: (typeof products)[number]) =>
-    Number(isWholesale ? p.wholesale_price : p.price);
+    offer
+      ? Number(offer.price) / offer.item_count
+      : Number(isWholesale ? p.wholesale_price : p.price);
 
   const selectCustomer = (id: string) => {
     setCustomerId(id);
@@ -106,11 +125,19 @@ function PdvPage() {
     return p ? [{ ...i, product: p, unit: priceOf(p) }] : [];
   });
 
-  const subtotal = lines.reduce((s, l) => s + l.unit * l.quantity, 0);
+  const units = cart.reduce((s, i) => s + i.quantity, 0);
+  const offerComplete = offer ? units === offer.item_count : true;
+
+  // com oferta o preço é fechado, não a soma dos itens
+  const subtotal = offer ? Number(offer.price) : lines.reduce((s, l) => s + l.unit * l.quantity, 0);
   const discountValue = Math.min(Number(discount || 0), subtotal);
   const total = subtotal - discountValue;
 
   const add = (p: (typeof products)[number]) => {
+    if (offer && units >= offer.item_count) {
+      toast.error(`A oferta ${offer.name} leva ${offer.item_count} itens`);
+      return;
+    }
     const inCart = cart.find((i) => i.productId === p.id)?.quantity ?? 0;
     if (inCart >= (p.available_stock ?? 0)) {
       toast.error(
@@ -145,10 +172,17 @@ function PdvPage() {
 
   const reset = () => {
     setCart([]);
+    setOfferId(null);
     setDiscount("0");
     setCustomerId("none");
     setAddress("");
     setNeighborhood("");
+  };
+
+  // trocar de oferta muda quantos itens cabem, então o carrinho recomeça
+  const selectOffer = (id: string | null) => {
+    setOfferId(id);
+    setCart([]);
   };
 
   const finish = useMutation({
@@ -163,6 +197,7 @@ function PdvPage() {
         p_items: cart.map((i) => ({ product_id: i.productId, quantity: i.quantity })),
         ...(addr ? { p_address: addr } : {}),
         ...(hood ? { p_neighborhood: hood } : {}),
+        ...(offerId ? { p_offer: offerId } : {}),
         p_discount: discountValue,
         p_counter_sale: counterSale,
       });
@@ -187,12 +222,19 @@ function PdvPage() {
 
   const missingCustomer = mode === "delivery" && customerId === "none";
   const missingAddress = mode === "delivery" && !address.trim();
-  const blocked = finish.isPending || cart.length === 0 || missingCustomer || missingAddress;
+  const blocked =
+    finish.isPending || cart.length === 0 || !offerComplete || missingCustomer || missingAddress;
 
   return (
     <AppShell
       title="Nova venda"
-      subtitle={isWholesale ? "Preços de atacado aplicados" : "Preços de varejo"}
+      subtitle={
+        offer
+          ? `${offer.name} · ${brl(Number(offer.price) / offer.item_count)} por item`
+          : isWholesale
+            ? "Preços de atacado aplicados"
+            : "Preços de varejo"
+      }
     >
       <div className="grid gap-5 lg:grid-cols-5">
         <section className="panel lg:col-span-3">
@@ -252,6 +294,48 @@ function PdvPage() {
               </button>
             ))}
           </header>
+
+          <div className="border-b border-border p-3">
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                onClick={() => selectOffer(null)}
+                className={`rounded-md px-3 py-1.5 text-xs transition-colors ${
+                  !offerId
+                    ? "bg-secondary font-medium text-secondary-foreground"
+                    : "text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                Avulso
+              </button>
+              {offers.map((o) => (
+                <button
+                  key={o.id}
+                  onClick={() => selectOffer(o.id)}
+                  className={`rounded-md px-3 py-1.5 text-xs transition-colors ${
+                    offerId === o.id
+                      ? "bg-accent font-medium text-accent-foreground"
+                      : "text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  {o.name}
+                </button>
+              ))}
+            </div>
+            {offer ? (
+              <p
+                className={`mt-2 text-xs ${
+                  offerComplete ? "text-success" : "text-muted-foreground"
+                }`}
+              >
+                {units} de {offer.item_count} itens escolhidos
+                {offerComplete ? " · pode finalizar" : ""}
+              </p>
+            ) : (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Venda avulsa conta como orgânica, fora do tráfego.
+              </p>
+            )}
+          </div>
 
           <div className="flex-1 divide-y divide-border">
             {lines.map((l) => (
@@ -360,7 +444,7 @@ function PdvPage() {
 
             <div className="rounded-lg bg-secondary p-3 text-sm">
               <div className="flex justify-between text-muted-foreground">
-                <span>Subtotal</span>
+                <span>{offer ? offer.name : "Subtotal"}</span>
                 <span>{brl(subtotal)}</span>
               </div>
               <div className="flex justify-between text-muted-foreground">
