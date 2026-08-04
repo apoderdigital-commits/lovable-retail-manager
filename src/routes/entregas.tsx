@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { AppShell } from "@/components/AppShell";
+import { AppShell, Metric } from "@/components/AppShell";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -48,6 +48,19 @@ export const Route = createFileRoute("/entregas")({
   }),
   component: DeliveriesPage,
 });
+
+type RouteSummary = {
+  route_id: string;
+  courier_id: string;
+  dispatched_at: string | null;
+  closed_at: string | null;
+  stops: number;
+  delivered: number;
+  not_delivered: number;
+  pending: number;
+  fee_payable: number;
+  cash_collected: number;
+};
 
 // data local no formato YYYY-MM-DD, sem escorregar de fuso
 const todayISO = () => new Date().toLocaleDateString("sv-SE");
@@ -114,6 +127,30 @@ function DeliveriesPage() {
     },
   });
 
+  // as entregas já concluídas não estão em `orders`, que só traz pedido
+  // em aberto. o resumo vem fechado do banco.
+  const { data: summary = [] } = useQuery({
+    queryKey: ["route-summary", today],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("route_day_summary", { p_date: today });
+      if (error) throw error;
+      return (data ?? []) as RouteSummary[];
+    },
+  });
+
+  const summaryOf = (routeId: string) => summary.find((r) => r.route_id === routeId) ?? null;
+
+  const dia = summary.reduce(
+    (acc, r) => ({
+      corridas: acc.corridas + Number(r.delivered),
+      falhas: acc.falhas + Number(r.not_delivered),
+      naRua: acc.naRua + Number(r.pending),
+      taxa: acc.taxa + Number(r.fee_payable),
+      especie: acc.especie + Number(r.cash_collected),
+    }),
+    { corridas: 0, falhas: 0, naRua: 0, taxa: 0, especie: 0 },
+  );
+
   const feeOf = (neighborhood: string | null) =>
     Number(fees.find((f) => f.neighborhood === neighborhood)?.amount ?? 0);
 
@@ -125,6 +162,7 @@ function DeliveriesPage() {
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["dispatch"] });
     qc.invalidateQueries({ queryKey: ["routes"] });
+    qc.invalidateQueries({ queryKey: ["route-summary"] });
     qc.invalidateQueries({ queryKey: ["orders"] });
   };
 
@@ -222,6 +260,31 @@ function DeliveriesPage() {
         ) : null
       }
     >
+      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Metric
+          label="Corridas entregues"
+          value={String(dia.corridas)}
+          hint={dia.falhas > 0 ? `${dia.falhas} não entregue(s)` : "no dia de hoje"}
+        />
+        <Metric
+          label="Taxa a pagar"
+          value={brl(dia.taxa)}
+          tone="accent"
+          hint="só entregas concluídas"
+        />
+        <Metric
+          label="Dinheiro a acertar"
+          value={brl(dia.especie)}
+          hint="recebido em espécie"
+        />
+        <Metric
+          label="Ainda na rua"
+          value={String(dia.naRua)}
+          tone={dia.naRua > 0 ? "warning" : "default"}
+          hint="paradas pendentes"
+        />
+      </div>
+
       {couriers.length === 0 && (
         <div className="panel mb-4 p-4 text-sm text-muted-foreground">
           Nenhum entregador cadastrado. Crie o acesso em Usuários com o papel Entregador.
@@ -366,7 +429,7 @@ function DeliveriesPage() {
                   </Button>
 
                   {running.map((r) => {
-                    const n = stopsOf(r.id).length;
+                    const sm = summaryOf(r.id);
                     const hora = r.dispatched_at
                       ? new Date(r.dispatched_at).toLocaleTimeString("pt-BR", {
                           hour: "2-digit",
@@ -398,20 +461,26 @@ function DeliveriesPage() {
                         </div>
                       </div>
                     ) : (
-                      <Button
-                        key={r.id}
-                        variant="outline"
-                        className="w-full justify-between"
-                        size="sm"
-                        onClick={() => setClosing(r.id)}
-                      >
-                        <span className="flex items-center gap-1.5">
-                          <Flag className="size-3.5" /> Encerrar saída das {hora}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {n} parada{n === 1 ? "" : "s"}
-                        </span>
-                      </Button>
+                      <div key={r.id} className="rounded-md border border-border">
+                        <div className="flex items-baseline justify-between px-2.5 pt-2 text-xs">
+                          <span className="font-medium">Saída das {hora}</span>
+                          <span className="text-muted-foreground">
+                            {sm ? `${sm.delivered}/${sm.stops}` : "—"} entregue(s)
+                          </span>
+                        </div>
+                        <div className="flex items-baseline justify-between px-2.5 pb-2 text-xs text-muted-foreground">
+                          <span>taxa {brl(Number(sm?.fee_payable ?? 0))}</span>
+                          <span>espécie {brl(Number(sm?.cash_collected ?? 0))}</span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          className="w-full rounded-t-none border-t border-border"
+                          size="sm"
+                          onClick={() => setClosing(r.id)}
+                        >
+                          <Flag className="mr-1.5 size-3.5" /> Encerrar saída
+                        </Button>
+                      </div>
                     );
                   })}
                 </div>
