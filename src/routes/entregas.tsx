@@ -167,8 +167,8 @@ function DeliveriesPage() {
     onSuccess: (r) => {
       setClosing(null);
       toast.success(
-        `Rota encerrada — ${r.delivered} entregue(s), taxa de ${brl(Number(r.fee_payable))}. ` +
-          `Dinheiro a acertar: ${brl(Number(r.cash_in_hand))}.`,
+        `Rota encerrada — ${r["delivered"]} entregue(s), taxa de ${brl(Number(r["fee_payable"]))}. ` +
+          `Dinheiro a acertar: ${brl(Number(r["cash_in_hand"]))}.`,
         { duration: 10000 },
       );
       invalidate();

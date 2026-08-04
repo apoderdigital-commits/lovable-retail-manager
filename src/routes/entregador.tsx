@@ -120,8 +120,8 @@ function CourierPage() {
     },
     onSuccess: (r) => {
       toast.success(
-        `Rota encerrada. ${r.delivered} entregue(s) · taxa ${brl(Number(r.fee_payable))} · ` +
-          `dinheiro a acertar ${brl(Number(r.cash_in_hand))}`,
+        `Rota encerrada. ${r["delivered"]} entregue(s) · taxa ${brl(Number(r["fee_payable"]))} · ` +
+          `dinheiro a acertar ${brl(Number(r["cash_in_hand"]))}`,
         { duration: 12000 },
       );
       qc.invalidateQueries({ queryKey: ["my-route-header"] });
@@ -242,7 +242,7 @@ function StopCard({
       const { error } = await supabase.rpc("transition_sale", {
         p_sale: stop.id,
         p_to: "not_delivered",
-        p_reason: reason,
+        ...(reason ? { p_reason: reason } : {}),
       });
       if (error) throw error;
     },
@@ -353,7 +353,7 @@ function StopCard({
           {action === "fail" && (
             <div className="space-y-2">
               <Label>Motivo</Label>
-              <Select value={reason} onValueChange={setReason}>
+              <Select value={reason ?? ""} onValueChange={setReason}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
