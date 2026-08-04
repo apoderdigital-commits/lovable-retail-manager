@@ -429,7 +429,7 @@ export type Database = {
         Args: {
           p_address?: string | null
           p_counter_sale?: boolean
-          p_customer: string
+          p_customer: string | null
           p_discount?: number
           p_items: Json
           p_neighborhood?: string | null
