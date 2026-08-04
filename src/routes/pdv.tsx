@@ -155,15 +155,18 @@ function PdvPage() {
     mutationFn: async (counterSale: boolean) => {
       // o banco calcula o total de verdade, reserva o estoque e aplica o
       // preço da tabela do cliente. o que está na tela é só prévia.
+      const addr = counterSale ? "" : address.trim();
+      const hood = counterSale ? "" : neighborhood.trim();
       const { data, error } = await supabase.rpc("create_order", {
-        p_customer: customerId === "none" ? null : customerId,
+        ...(customerId === "none" ? {} : { p_customer: customerId }),
         p_payment_method: payment,
         p_items: cart.map((i) => ({ product_id: i.productId, quantity: i.quantity })),
-        p_address: counterSale ? null : address.trim() || null,
-        p_neighborhood: counterSale ? null : neighborhood.trim() || null,
+        ...(addr ? { p_address: addr } : {}),
+        ...(hood ? { p_neighborhood: hood } : {}),
         p_discount: discountValue,
         p_counter_sale: counterSale,
       });
+
       if (error) throw error;
       return { sale: data, counterSale };
     },
