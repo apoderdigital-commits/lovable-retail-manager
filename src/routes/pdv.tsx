@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { Minus, Plus, Search, Trash2, CheckCircle2, Truck } from "lucide-react";
+import { Minus, Plus, Search, Trash2, CheckCircle2, Truck, Sparkles, Repeat } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
@@ -37,6 +37,10 @@ export const Route = createFileRoute("/pdv")({
 });
 
 type Mode = "counter" | "delivery";
+
+// dias inteiros desde a data, para o "última há N dias"
+const dias = (iso: string) =>
+  Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86400000));
 
 const payments = ["dinheiro", "pix", "débito", "crédito", "boleto"];
 
@@ -90,6 +94,18 @@ function PdvPage() {
         .order("item_count");
       if (error) throw error;
       return data;
+    },
+  });
+
+  // histórico do cliente: o atendente precisa saber na hora se está
+  // atendendo alguém novo ou um cliente que já volta há tempo
+  const { data: stats } = useQuery({
+    queryKey: ["customer-stats", customerId],
+    enabled: customerId !== "none",
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("customer_stats", { p_customer: customerId });
+      if (error) throw error;
+      return data as { orders: number; total_spent: number; last_order_at: string | null };
     },
   });
 
@@ -389,10 +405,26 @@ function PdvPage() {
                   ))}
                 </SelectContent>
               </Select>
-              {isWholesale && (
-                <Badge variant="secondary" className="mt-1">
-                  Tabela de atacado
-                </Badge>
+              {customerId !== "none" && stats && (
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  {Number(stats.orders) === 0 ? (
+                    <Badge className="border-transparent bg-accent text-accent-foreground">
+                      <Sparkles className="mr-1 size-3" /> Novo cliente
+                    </Badge>
+                  ) : (
+                    <Badge className="border-transparent bg-success text-success-foreground">
+                      <Repeat className="mr-1 size-3" />
+                      {Number(stats.orders) + 1}º pedido na sua loja
+                    </Badge>
+                  )}
+                  {isWholesale && <Badge variant="secondary">Tabela de atacado</Badge>}
+                  {Number(stats.orders) > 0 && (
+                    <span className="text-xs text-muted-foreground">
+                      já gastou {brl(Number(stats.total_spent))}
+                      {stats.last_order_at && ` · última há ${dias(stats.last_order_at)} dia(s)`}
+                    </span>
+                  )}
+                </div>
               )}
             </div>
 

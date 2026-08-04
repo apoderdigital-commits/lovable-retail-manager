@@ -12,6 +12,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogFooter,
@@ -52,16 +59,40 @@ type Form = {
   phone: string;
   email: string;
   document: string;
+  customer_type: "retail" | "wholesale";
+  zip_code: string;
+  address: string;
+  neighborhood: string;
+  city: string;
+  reference_point: string;
   notes: string;
 };
 
-const empty: Form = { name: "", phone: "", email: "", document: "", notes: "" };
+const empty: Form = {
+  name: "",
+  phone: "",
+  email: "",
+  document: "",
+  customer_type: "retail",
+  zip_code: "",
+  address: "",
+  neighborhood: "",
+  city: "",
+  reference_point: "",
+  notes: "",
+};
 
 const schema = z.object({
   name: z.string().trim().min(2, { message: "Informe o nome do cliente" }).max(120),
   phone: z.string().trim().max(30),
   email: z.union([z.string().trim().email({ message: "E-mail inválido" }).max(255), z.literal("")]),
   document: z.string().trim().max(30),
+  customer_type: z.enum(["retail", "wholesale"]),
+  zip_code: z.string().trim().max(12),
+  address: z.string().trim().max(200),
+  neighborhood: z.string().trim().max(80),
+  city: z.string().trim().max(80),
+  reference_point: z.string().trim().max(200),
   notes: z.string().trim().max(500),
 });
 
@@ -90,6 +121,12 @@ function CustomersPage() {
         phone: parsed.data.phone || null,
         email: parsed.data.email || null,
         document: parsed.data.document || null,
+        customer_type: parsed.data.customer_type,
+        zip_code: parsed.data.zip_code || null,
+        address: parsed.data.address || null,
+        neighborhood: parsed.data.neighborhood || null,
+        city: parsed.data.city || null,
+        reference_point: parsed.data.reference_point || null,
         notes: parsed.data.notes || null,
       };
       if (input.id) {
@@ -138,10 +175,11 @@ function CustomersPage() {
               <Plus className="mr-2 size-4" /> Novo cliente
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
             <DialogHeader>
               <DialogTitle>{form.id ? "Editar cliente" : "Novo cliente"}</DialogTitle>
             </DialogHeader>
+
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5 sm:col-span-2">
                 <Label>Nome</Label>
@@ -151,11 +189,28 @@ function CustomersPage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>Telefone</Label>
+                <Label>Telefone / WhatsApp</Label>
                 <Input
                   value={form.phone}
                   onChange={(e) => setForm({ ...form, phone: e.target.value })}
                 />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Tipo</Label>
+                <Select
+                  value={form.customer_type}
+                  onValueChange={(v) =>
+                    setForm({ ...form, customer_type: v as "retail" | "wholesale" })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="retail">Varejo</SelectItem>
+                    <SelectItem value="wholesale">Atacado</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-1.5">
                 <Label>Documento</Label>
@@ -164,7 +219,7 @@ function CustomersPage() {
                   onChange={(e) => setForm({ ...form, document: e.target.value })}
                 />
               </div>
-              <div className="space-y-1.5 sm:col-span-2">
+              <div className="space-y-1.5">
                 <Label>E-mail</Label>
                 <Input
                   type="email"
@@ -172,13 +227,64 @@ function CustomersPage() {
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
                 />
               </div>
-              <div className="space-y-1.5 sm:col-span-2">
-                <Label>Observações</Label>
-                <Textarea
-                  value={form.notes}
-                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                />
+            </div>
+
+            <div className="mt-1 border-t border-border pt-3">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Entrega
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>CEP</Label>
+                  <Input
+                    inputMode="numeric"
+                    placeholder="00000-000"
+                    value={form.zip_code}
+                    onChange={(e) => setForm({ ...form, zip_code: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Cidade</Label>
+                  <Input
+                    value={form.city}
+                    onChange={(e) => setForm({ ...form, city: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label>Endereço</Label>
+                  <Input
+                    placeholder="Rua, número e complemento"
+                    value={form.address}
+                    onChange={(e) => setForm({ ...form, address: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label>Bairro</Label>
+                  <Input
+                    value={form.neighborhood}
+                    onChange={(e) => setForm({ ...form, neighborhood: e.target.value })}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    É o bairro que define a taxa do entregador.
+                  </p>
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label>Ponto de referência</Label>
+                  <Input
+                    placeholder="Portão azul, ao lado da padaria"
+                    value={form.reference_point}
+                    onChange={(e) => setForm({ ...form, reference_point: e.target.value })}
+                  />
+                </div>
               </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Observações</Label>
+              <Textarea
+                value={form.notes}
+                onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              />
             </div>
             <DialogFooter>
               <Button disabled={save.isPending} onClick={() => save.mutate(form)}>
@@ -205,7 +311,8 @@ function CustomersPage() {
               <TableHead>Cliente</TableHead>
               <TableHead>Telefone</TableHead>
               <TableHead>E-mail</TableHead>
-              <TableHead>Documento</TableHead>
+              <TableHead>Bairro</TableHead>
+              <TableHead>Tipo</TableHead>
               <TableHead />
             </TableRow>
           </TableHeader>
@@ -215,7 +322,10 @@ function CustomersPage() {
                 <TableCell className="font-medium">{c.name}</TableCell>
                 <TableCell className="text-muted-foreground">{c.phone ?? "—"}</TableCell>
                 <TableCell className="text-muted-foreground">{c.email ?? "—"}</TableCell>
-                <TableCell className="text-muted-foreground">{c.document ?? "—"}</TableCell>
+                <TableCell className="text-muted-foreground">{c.neighborhood ?? "—"}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {c.customer_type === "wholesale" ? "Atacado" : "Varejo"}
+                </TableCell>
                 <TableCell className="text-right">
                   <Button
                     variant="ghost"
@@ -227,6 +337,12 @@ function CustomersPage() {
                         phone: c.phone ?? "",
                         email: c.email ?? "",
                         document: c.document ?? "",
+                        customer_type: c.customer_type ?? "retail",
+                        zip_code: c.zip_code ?? "",
+                        address: c.address ?? "",
+                        neighborhood: c.neighborhood ?? "",
+                        city: c.city ?? "",
+                        reference_point: c.reference_point ?? "",
                         notes: c.notes ?? "",
                       });
                       setOpen(true);
