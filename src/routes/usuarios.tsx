@@ -89,11 +89,24 @@ function UsersPage() {
       const { data, error } = await supabase.functions.invoke("admin-create-user", {
         body: form,
       });
-      // a Edge Function devolve a mensagem no corpo mesmo quando falha
+
+      // quando a função responde com status de erro, o supabase-js entrega
+      // só "non-2xx status code" e guarda o corpo em error.context. sem ler
+      // dali, a mensagem real do servidor nunca chega na tela.
       if (error) {
-        const detail = (data as { error?: string } | null)?.error;
-        throw new Error(detail || error.message);
+        let detail = error.message;
+        const res = (error as { context?: Response }).context;
+        if (res && typeof res.json === "function") {
+          try {
+            const body = await res.json();
+            if (body?.error) detail = body.error;
+          } catch {
+            // corpo não era JSON: fica a mensagem genérica mesmo
+          }
+        }
+        throw new Error(detail);
       }
+
       if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
       return data;
     },
@@ -147,6 +160,12 @@ function UsersPage() {
 
   const admins = people.filter((p) => p.roles.some((r) => r.role === "admin")).length;
 
+  // mesmas regras da Edge Function, para o erro aparecer antes do envio
+  const valid =
+    form.full_name.trim().length > 0 &&
+    /\S+@\S+\.\S+/.test(form.email.trim()) &&
+    form.password.length >= 8;
+
   return (
     <AppShell
       title="Usuários"
@@ -174,6 +193,7 @@ function UsersPage() {
                 <Label>E-mail</Label>
                 <Input
                   type="email"
+                  placeholder="nome@dominio.com"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
                 />
@@ -213,7 +233,10 @@ function UsersPage() {
               </div>
             </div>
             <DialogFooter>
-              <Button disabled={create.isPending} onClick={() => create.mutate()}>
+              <Button
+                disabled={create.isPending || !valid}
+                onClick={() => create.mutate()}
+              >
                 Criar acesso
               </Button>
             </DialogFooter>
