@@ -1,12 +1,32 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Bike, Send, Undo2, CalendarClock, Flag } from "lucide-react";
+import {
+  Bike,
+  Send,
+  Undo2,
+  CalendarClock,
+  Flag,
+  Coins,
+  Plus,
+  Trash2,
+  AlertTriangle,
+} from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -34,6 +54,7 @@ const todayISO = () => new Date().toLocaleDateString("sv-SE");
 
 function DeliveriesPage() {
   const qc = useQueryClient();
+  const { isAdmin } = useAuth();
   const today = todayISO();
   const [closing, setClosing] = useState<string | null>(null);
 
@@ -190,6 +211,16 @@ function DeliveriesPage() {
         day: "numeric",
         month: "long",
       })}
+      actions={
+        isAdmin ? (
+          <FeeSettings
+            fees={fees}
+            neighborhoods={[
+              ...new Set(orders.map((o) => o.neighborhood).filter((b): b is string => !!b)),
+            ]}
+          />
+        ) : null
+      }
     >
       {couriers.length === 0 && (
         <div className="panel mb-4 p-4 text-sm text-muted-foreground">
@@ -390,5 +421,176 @@ function DeliveriesPage() {
         </div>
       </div>
     </AppShell>
+  );
+}
+
+type Fee = { id: string; neighborhood: string; amount: number };
+
+/**
+ * Taxas por bairro. Fica atrás de um botão porque taxa muda uma vez por
+ * mês, e o quadro de despacho é usado o dia inteiro.
+ */
+function FeeSettings({ fees, neighborhoods }: { fees: Fee[]; neighborhoods: string[] }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [novo, setNovo] = useState({ neighborhood: "", amount: "" });
+
+  // bairro que tem pedido mas não tem taxa: o entregador receberia zero
+  // por essa parada e ninguém perceberia até o acerto do fim do dia
+  const semTaxa = neighborhoods.filter((b) => !fees.some((f) => f.neighborhood === b));
+
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["delivery-fees"] });
+    qc.invalidateQueries({ queryKey: ["finance"] });
+  };
+
+  const salvar = useMutation({
+    mutationFn: async ({ id, value }: { id: string; value: number }) => {
+      const { error } = await supabase.from("delivery_fees").update({ amount: value }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Taxa atualizada");
+      refresh();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const adicionar = useMutation({
+    mutationFn: async (bairro?: string) => {
+      const nome = (bairro ?? novo.neighborhood).trim();
+      if (!nome) throw new Error("Informe o bairro");
+      const { error } = await supabase
+        .from("delivery_fees")
+        .insert({ neighborhood: nome, amount: Number(novo.amount || 0) });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setNovo({ neighborhood: "", amount: "" });
+      refresh();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const remover = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("delivery_fees").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: refresh,
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm">
+          <Coins className="mr-1.5 size-3.5" /> Taxas por bairro
+          {semTaxa.length > 0 && (
+            <Badge className="ml-2 border-transparent bg-warning text-[10px] text-warning-foreground">
+              {semTaxa.length}
+            </Badge>
+          )}
+        </Button>
+      </DialogTrigger>
+
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Taxas de entrega</DialogTitle>
+        </DialogHeader>
+
+        <p className="text-xs text-muted-foreground">
+          O valor é aplicado no despacho, conforme o bairro do pedido. Depois de despachada, a rota
+          mantém a taxa que valia naquele momento.
+        </p>
+
+        {semTaxa.length > 0 && (
+          <div className="rounded-md border border-warning/40 bg-warning/10 p-3">
+            <div className="mb-1.5 flex items-center gap-1.5">
+              <AlertTriangle className="size-3.5 text-warning" />
+              <p className="text-xs font-medium">Bairro com pedido e sem taxa</p>
+            </div>
+            <p className="mb-2 text-xs text-muted-foreground">
+              Essas entregas sairiam pagando zero ao entregador.
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {semTaxa.map((b) => (
+                <Button
+                  key={b}
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs"
+                  onClick={() => adicionar.mutate(b)}
+                >
+                  <Plus className="mr-1 size-3" /> {b}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="space-y-2">
+          {fees.map((f) => (
+            <div key={f.id} className="flex items-end gap-2">
+              <div className="flex-1 space-y-1.5">
+                <Label className="text-xs">{f.neighborhood}</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  defaultValue={f.amount}
+                  onBlur={(e) => {
+                    const v = Number(e.target.value || 0);
+                    if (v !== Number(f.amount)) salvar.mutate({ id: f.id, value: v });
+                  }}
+                />
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="mb-0.5"
+                onClick={() => remover.mutate(f.id)}
+              >
+                <Trash2 className="size-4 text-destructive" />
+              </Button>
+            </div>
+          ))}
+          {fees.length === 0 && (
+            <p className="py-4 text-center text-sm text-muted-foreground">
+              Nenhuma taxa cadastrada ainda.
+            </p>
+          )}
+        </div>
+
+        <div className="flex items-end gap-2 border-t border-border pt-3">
+          <div className="flex-1 space-y-1.5">
+            <Label className="text-xs">Novo bairro</Label>
+            <Input
+              placeholder="Centro"
+              value={novo.neighborhood}
+              onChange={(e) => setNovo({ ...novo, neighborhood: e.target.value })}
+            />
+          </div>
+          <div className="w-24 space-y-1.5">
+            <Label className="text-xs">Taxa</Label>
+            <Input
+              type="number"
+              step="0.01"
+              placeholder="0,00"
+              value={novo.amount}
+              onChange={(e) => setNovo({ ...novo, amount: e.target.value })}
+            />
+          </div>
+          <Button
+            variant="outline"
+            size="icon"
+            className="mb-0.5"
+            disabled={adicionar.isPending}
+            onClick={() => adicionar.mutate(undefined)}
+          >
+            <Plus className="size-4" />
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
