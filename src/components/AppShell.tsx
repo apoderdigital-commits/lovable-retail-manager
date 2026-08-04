@@ -13,6 +13,7 @@ import {
   Bike,
   ShieldCheck,
   Megaphone,
+  Wallet,
   Settings,
 } from "lucide-react";
 import { useAuth, ROLE_LABEL } from "@/hooks/useAuth";
@@ -29,6 +30,7 @@ const nav = [
   { to: "/clientes", label: "Clientes", icon: Users, access: "staff" },
   { to: "/relatorios", label: "Relatórios", icon: BarChart3, access: "staff" },
   { to: "/marketing", label: "Marketing", icon: Megaphone, access: "staff" },
+  { to: "/financeiro", label: "Financeiro", icon: Wallet, access: "staff" },
   { to: "/usuarios", label: "Usuários", icon: ShieldCheck, access: "admin" },
   { to: "/configuracoes", label: "Configurações", icon: Settings, access: "admin" },
 ] as const;

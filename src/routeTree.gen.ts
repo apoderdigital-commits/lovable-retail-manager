@@ -16,6 +16,7 @@ import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
 import { Route as EntregadorRouteImport } from './routes/entregador'
 import { Route as EntregasRouteImport } from './routes/entregas'
 import { Route as MarketingRouteImport } from './routes/marketing'
+import { Route as FinanceiroRouteImport } from './routes/financeiro'
 import { Route as PdvRouteImport } from './routes/pdv'
 import { Route as PedidosRouteImport } from './routes/pedidos'
 import { Route as ProdutosRouteImport } from './routes/produtos'
@@ -91,6 +92,7 @@ export interface FileRoutesByFullPath {
   '/entregador': typeof EntregadorRoute
   '/entregas': typeof EntregasRoute
   '/marketing': typeof MarketingRoute
+  '/financeiro': typeof FinanceiroRoute
   '/pdv': typeof PdvRoute
   '/pedidos': typeof PedidosRoute
   '/produtos': typeof ProdutosRoute
@@ -105,6 +107,7 @@ export interface FileRoutesByTo {
   '/entregador': typeof EntregadorRoute
   '/entregas': typeof EntregasRoute
   '/marketing': typeof MarketingRoute
+  '/financeiro': typeof FinanceiroRoute
   '/pdv': typeof PdvRoute
   '/pedidos': typeof PedidosRoute
   '/produtos': typeof ProdutosRoute
@@ -120,6 +123,7 @@ export interface FileRoutesById {
   '/entregador': typeof EntregadorRoute
   '/entregas': typeof EntregasRoute
   '/marketing': typeof MarketingRoute
+  '/financeiro': typeof FinanceiroRoute
   '/pdv': typeof PdvRoute
   '/pedidos': typeof PedidosRoute
   '/produtos': typeof ProdutosRoute
@@ -136,6 +140,7 @@ export interface FileRouteTypes {
     | '/entregador'
     | '/entregas'
     | '/marketing'
+    | '/financeiro'
     | '/pdv'
     | '/pedidos'
     | '/produtos'
@@ -150,6 +155,7 @@ export interface FileRouteTypes {
     | '/entregador'
     | '/entregas'
     | '/marketing'
+    | '/financeiro'
     | '/pdv'
     | '/pedidos'
     | '/produtos'
@@ -164,6 +170,7 @@ export interface FileRouteTypes {
     | '/entregador'
     | '/entregas'
     | '/marketing'
+    | '/financeiro'
     | '/pdv'
     | '/pedidos'
     | '/produtos'
@@ -179,6 +186,7 @@ export interface RootRouteChildren {
   EntregadorRoute: typeof EntregadorRoute
   EntregasRoute: typeof EntregasRoute
   MarketingRoute: typeof MarketingRoute
+  FinanceiroRoute: typeof FinanceiroRoute
   PdvRoute: typeof PdvRoute
   PedidosRoute: typeof PedidosRoute
   ProdutosRoute: typeof ProdutosRoute
@@ -283,6 +291,7 @@ const rootRouteChildren: RootRouteChildren = {
   EntregadorRoute: EntregadorRoute,
   EntregasRoute: EntregasRoute,
   MarketingRoute: MarketingRoute,
+  FinanceiroRoute: FinanceiroRoute,
   PdvRoute: PdvRoute,
   PedidosRoute: PedidosRoute,
   ProdutosRoute: ProdutosRoute,
