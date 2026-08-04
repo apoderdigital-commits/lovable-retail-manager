@@ -14,6 +14,68 @@ export type Database = {
   }
   public: {
     Tables: {
+      ad_campaigns: {
+        Row: {
+          id: string
+          name: string
+          status: string | null
+          synced_at: string
+        }
+        Insert: {
+          id: string
+          name: string
+          status?: string | null
+          synced_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          status?: string | null
+          synced_at?: string
+        }
+        Relationships: []
+      }
+      ad_insights: {
+        Row: {
+          campaign_id: string
+          clicks: number
+          conversations: number
+          date: string
+          impressions: number
+          reach: number
+          spend: number
+          synced_at: string
+        }
+        Insert: {
+          campaign_id: string
+          clicks?: number
+          conversations?: number
+          date: string
+          impressions?: number
+          reach?: number
+          spend?: number
+          synced_at?: string
+        }
+        Update: {
+          campaign_id?: string
+          clicks?: number
+          conversations?: number
+          date?: string
+          impressions?: number
+          reach?: number
+          spend?: number
+          synced_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_insights_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "ad_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           address: string | null
@@ -71,6 +133,87 @@ export type Database = {
           amount?: number
           id?: string
           neighborhood?: string
+        }
+        Relationships: []
+      }
+      integration_settings: {
+        Row: {
+          access_token: string | null
+          ad_account_id: string | null
+          id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          access_token?: string | null
+          ad_account_id?: string | null
+          id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          access_token?: string | null
+          ad_account_id?: string | null
+          id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      offer_campaigns: {
+        Row: {
+          campaign_id: string
+          offer_id: string
+        }
+        Insert: {
+          campaign_id: string
+          offer_id: string
+        }
+        Update: {
+          campaign_id?: string
+          offer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offer_campaigns_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "ad_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offer_campaigns_offer_id_fkey"
+            columns: ["offer_id"]
+            isOneToOne: false
+            referencedRelation: "offers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      offers: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          item_count: number
+          name: string
+          price: number
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          item_count: number
+          name: string
+          price: number
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          item_count?: number
+          name?: string
+          price?: number
         }
         Relationships: []
       }
@@ -276,6 +419,7 @@ export type Database = {
           fee_due: boolean
           id: string
           neighborhood: string | null
+          offer_id: string | null
           payment_method: string
           proof_url: string | null
           reason: string | null
@@ -298,6 +442,7 @@ export type Database = {
           fee_due?: boolean
           id?: string
           neighborhood?: string | null
+          offer_id?: string | null
           payment_method?: string
           proof_url?: string | null
           reason?: string | null
@@ -320,6 +465,7 @@ export type Database = {
           fee_due?: boolean
           id?: string
           neighborhood?: string | null
+          offer_id?: string | null
           payment_method?: string
           proof_url?: string | null
           reason?: string | null
@@ -338,6 +484,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_offer_id_fkey"
+            columns: ["offer_id"]
+            isOneToOne: false
+            referencedRelation: "offers"
             referencedColumns: ["id"]
           },
           {
@@ -432,6 +585,7 @@ export type Database = {
           p_discount?: number
           p_items: Json
           p_neighborhood?: string
+          p_offer?: string
           p_payment_method: string
         }
         Returns: {
@@ -444,6 +598,7 @@ export type Database = {
           fee_due: boolean
           id: string
           neighborhood: string | null
+          offer_id: string | null
           payment_method: string
           proof_url: string | null
           reason: string | null
@@ -477,6 +632,43 @@ export type Database = {
       }
       is_courier: { Args: never; Returns: boolean }
       is_staff: { Args: never; Returns: boolean }
+      ltv_by_acquisition: {
+        Args: never
+        Returns: {
+          avg_ltv: number
+          avg_orders: number
+          customers: number
+          offer_id: string
+          offer_name: string
+          total_revenue: number
+        }[]
+      }
+      meta_settings_status: { Args: never; Returns: Json }
+      offer_performance: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          clicks: number
+          conversations: number
+          customers: number
+          offer_id: string
+          offer_name: string
+          revenue: number
+          sales_count: number
+          spend: number
+        }[]
+      }
+      organic_performance: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          customers: number
+          revenue: number
+          sales_count: number
+        }[]
+      }
+      save_meta_settings: {
+        Args: { p_account: string; p_token?: string }
+        Returns: Json
+      }
       transition_sale: {
         Args: {
           p_proof?: string
@@ -495,6 +687,7 @@ export type Database = {
           fee_due: boolean
           id: string
           neighborhood: string | null
+          offer_id: string | null
           payment_method: string
           proof_url: string | null
           reason: string | null
