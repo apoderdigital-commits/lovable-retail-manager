@@ -10,20 +10,25 @@ import {
   Store,
   Receipt,
   Truck,
+  Bike,
 } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, ROLE_LABEL } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 const nav = [
-  { to: "/", label: "Painel", icon: LayoutDashboard },
-  { to: "/pdv", label: "Nova venda", icon: ShoppingCart },
-  { to: "/pedidos", label: "Pedidos", icon: Receipt },
-  { to: "/entregas", label: "Entregas", icon: Truck },
-  { to: "/produtos", label: "Produtos", icon: Package },
-  { to: "/clientes", label: "Clientes", icon: Users },
-  { to: "/relatorios", label: "Relatórios", icon: BarChart3 },
+  { to: "/", label: "Painel", icon: LayoutDashboard, access: "staff" },
+  { to: "/pdv", label: "Nova venda", icon: ShoppingCart, access: "staff" },
+  { to: "/pedidos", label: "Pedidos", icon: Receipt, access: "staff" },
+  { to: "/entregas", label: "Entregas", icon: Truck, access: "staff" },
+  { to: "/entregador", label: "Minha rota", icon: Bike, access: "courier" },
+  { to: "/produtos", label: "Produtos", icon: Package, access: "staff" },
+  { to: "/clientes", label: "Clientes", icon: Users, access: "staff" },
+  { to: "/relatorios", label: "Relatórios", icon: BarChart3, access: "staff" },
 ] as const;
+
+// a única rota que um entregador puro alcança
+const COURIER_HOME = "/entregador";
 
 export function AppShell({
   title,
@@ -36,13 +41,21 @@ export function AppShell({
   actions?: ReactNode;
   children: ReactNode;
 }) {
-  const { user, loading, role, fullName, signOut } = useAuth();
+  const { user, loading, role, roles, isAdmin, isStaff, isCourier, fullName, signOut } = useAuth();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   useEffect(() => {
-    if (!loading && !user) navigate({ to: "/auth" });
-  }, [loading, user, navigate]);
+    if (loading) return;
+    if (!user) {
+      navigate({ to: "/auth" });
+      return;
+    }
+    // entregador sem papel de equipe não sai da própria rota
+    if (isCourier && !isStaff && pathname !== COURIER_HOME) {
+      navigate({ to: COURIER_HOME });
+    }
+  }, [loading, user, isCourier, isStaff, pathname, navigate]);
 
   if (loading || !user) {
     return (
@@ -51,6 +64,25 @@ export function AppShell({
       </div>
     );
   }
+
+  // usuário autenticado mas sem papel nenhum: sem isso a pessoa veria
+  // telas vazias sem entender por quê
+  if (roles.length === 0) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 px-6 text-center">
+        <p className="font-display text-lg font-semibold">Acesso ainda não liberado</p>
+        <p className="max-w-sm text-sm text-muted-foreground">
+          Sua conta foi criada, mas nenhum papel foi atribuído a ela. Peça a um administrador para
+          liberar seu acesso.
+        </p>
+        <Button variant="outline" size="sm" onClick={() => signOut()}>
+          <LogOut className="mr-2 size-4" /> Sair
+        </Button>
+      </div>
+    );
+  }
+
+  const visible = nav.filter((i) => (i.access === "staff" ? isStaff : isCourier || isAdmin));
 
   return (
     <div className="flex min-h-screen w-full bg-background">
@@ -62,7 +94,7 @@ export function AppShell({
           <span className="font-display text-lg font-semibold">Vieira Perfumes</span>
         </div>
         <nav className="flex flex-1 flex-col gap-1">
-          {nav.map((item) => {
+          {visible.map((item) => {
             const active = pathname === item.to;
             return (
               <Link
@@ -83,7 +115,7 @@ export function AppShell({
         <div className="mt-4 rounded-lg bg-sidebar-accent/50 p-3">
           <p className="truncate text-sm font-medium">{fullName || user.email}</p>
           <p className="mt-0.5 text-xs text-sidebar-foreground/60">
-            {role === "admin" ? "Administrador" : "Vendedor"}
+            {role ? ROLE_LABEL[role] : ""}
           </p>
           <Button
             variant="ghost"
@@ -109,7 +141,7 @@ export function AppShell({
         </header>
 
         <nav className="flex gap-1 overflow-x-auto border-b border-border bg-card px-3 py-2 md:hidden">
-          {nav.map((item) => (
+          {visible.map((item) => (
             <Link
               key={item.to}
               to={item.to}
