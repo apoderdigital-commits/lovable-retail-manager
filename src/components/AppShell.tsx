@@ -1,5 +1,5 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   LayoutDashboard,
   Package,
@@ -31,6 +31,33 @@ const nav = [
 
 // a única rota que um entregador puro alcança
 const COURIER_HOME = "/entregador";
+
+/**
+ * Logo da marca. Cai no ícone genérico se o arquivo não existir, para a
+ * tela não quebrar enquanto a imagem não estiver em public/.
+ */
+export function Logo({ size = "size-9" }: { size?: string }) {
+  const [broken, setBroken] = useState(false);
+
+  if (broken) {
+    return (
+      <span
+        className={`grid ${size} place-items-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground`}
+      >
+        <Store className="size-5" />
+      </span>
+    );
+  }
+
+  return (
+    <img
+      src="/logo-vieira.png"
+      alt="Vieira Perfumes"
+      className={`${size} shrink-0 rounded-lg object-contain`}
+      onError={() => setBroken(true)}
+    />
+  );
+}
 
 export function AppShell({
   title,
@@ -91,10 +118,8 @@ export function AppShell({
   return (
     <div className="flex min-h-screen w-full bg-background">
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col bg-sidebar px-3 py-5 text-sidebar-foreground md:flex">
-        <div className="mb-7 flex items-center gap-2 px-2">
-          <span className="grid size-9 place-items-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-            <Store className="size-5" />
-          </span>
+        <div className="mb-7 flex items-center gap-2.5 px-2">
+          <Logo />
           <span className="font-display text-lg font-semibold">Vieira Perfumes</span>
         </div>
         <nav className="flex flex-1 flex-col gap-1">

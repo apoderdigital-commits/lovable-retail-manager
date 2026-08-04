@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Store } from "lucide-react";
+import { Logo } from "@/components/AppShell";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { useAuth } from "@/hooks/useAuth";
@@ -99,10 +99,8 @@ function AuthPage() {
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
       <div className="hidden flex-col justify-between bg-sidebar p-10 text-sidebar-foreground lg:flex">
-        <div className="flex items-center gap-2">
-          <span className="grid size-9 place-items-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-            <Store className="size-5" />
-          </span>
+        <div className="flex items-center gap-2.5">
+          <Logo size="size-12" />
           <span className="font-display text-lg font-semibold">Vieira Perfumes</span>
         </div>
         <div className="max-w-sm">
