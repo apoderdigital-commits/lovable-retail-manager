@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Plus, Pencil, Trash2, Search } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
@@ -102,6 +102,35 @@ function CustomersPage() {
   const [term, setTerm] = useState("");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Form>(empty);
+  const [cepBusy, setCepBusy] = useState(false);
+
+  // ViaCEP: serviço público, sem chave. preenche rua, bairro e cidade;
+  // o número fica com a pessoa, porque CEP não sabe número.
+  const buscarCep = async (raw: string) => {
+    const cep = raw.replace(/\D/g, "");
+    if (cep.length !== 8) return;
+    setCepBusy(true);
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+      const data = await res.json();
+      if (data.erro) {
+        toast.error("CEP não encontrado");
+        return;
+      }
+      setForm((f) => ({
+        ...f,
+        // o "|| f.x" evita apagar o que já estava quando o CEP volta incompleto
+        address: data.logradouro || f.address,
+        neighborhood: data.bairro || f.neighborhood,
+        city: data.localidade ? `${data.localidade}${data.uf ? ` - ${data.uf}` : ""}` : f.city,
+      }));
+      toast.success("Endereço preenchido. Falta o número.");
+    } catch {
+      toast.error("Não foi possível consultar o CEP agora");
+    } finally {
+      setCepBusy(false);
+    }
+  };
 
   const { data: customers = [] } = useQuery({
     queryKey: ["customers"],
@@ -236,12 +265,23 @@ function CustomersPage() {
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>CEP</Label>
-                  <Input
-                    inputMode="numeric"
-                    placeholder="00000-000"
-                    value={form.zip_code}
-                    onChange={(e) => setForm({ ...form, zip_code: e.target.value })}
-                  />
+                  <div className="relative">
+                    <Input
+                      inputMode="numeric"
+                      placeholder="00000-000"
+                      value={form.zip_code}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setForm({ ...form, zip_code: v });
+                        // dispara sozinho ao completar os 8 dígitos
+                        if (v.replace(/\D/g, "").length === 8) buscarCep(v);
+                      }}
+                      onBlur={(e) => buscarCep(e.target.value)}
+                    />
+                    {cepBusy && (
+                      <Loader2 className="absolute right-2.5 top-2.5 size-4 animate-spin text-muted-foreground" />
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-1.5">
                   <Label>Cidade</Label>
@@ -253,7 +293,7 @@ function CustomersPage() {
                 <div className="space-y-1.5 sm:col-span-2">
                   <Label>Endereço</Label>
                   <Input
-                    placeholder="Rua, número e complemento"
+                    placeholder="Preenchido pelo CEP — complete com o número"
                     value={form.address}
                     onChange={(e) => setForm({ ...form, address: e.target.value })}
                   />
