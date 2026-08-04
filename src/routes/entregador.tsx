@@ -46,6 +46,17 @@ const REASONS = [
   "Cliente sem o pagamento",
 ];
 
+type RouteSummary = {
+  route_id: string;
+  courier_id: string;
+  stops: number;
+  delivered: number;
+  not_delivered: number;
+  pending: number;
+  fee_payable: number;
+  cash_collected: number;
+};
+
 const todayISO = () => new Date().toLocaleDateString("sv-SE");
 
 function CourierPage() {
@@ -89,6 +100,30 @@ function CourierPage() {
       return data;
     },
   });
+
+  // o banco já limita: entregador só recebe as próprias rotas, mesmo
+  // que a chamada venha por fora da tela
+  const { data: summary = [] } = useQuery({
+    queryKey: ["my-summary", courierId],
+    enabled: !!courierId,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("route_day_summary", {
+        p_date: new Date().toLocaleDateString("sv-SE"),
+      });
+      if (error) throw error;
+      return ((data ?? []) as RouteSummary[]).filter((r) => r.courier_id === courierId);
+    },
+  });
+
+  const dia = summary.reduce(
+    (acc, r) => ({
+      corridas: acc.corridas + Number(r.delivered),
+      falhas: acc.falhas + Number(r.not_delivered),
+      taxa: acc.taxa + Number(r.fee_payable),
+      especie: acc.especie + Number(r.cash_collected),
+    }),
+    { corridas: 0, falhas: 0, taxa: 0, especie: 0 },
+  );
 
   // o entregador pode ter mais de uma saída aberta no mesmo dia
   const { data: openRoutes = [] } = useQuery({
@@ -155,6 +190,30 @@ function CourierPage() {
             </SelectContent>
           </Select>
         )}
+
+        <div className="grid grid-cols-2 gap-2">
+          <div className="panel p-3">
+            <p className="text-xs text-muted-foreground">Corridas hoje</p>
+            <p className="mt-1 font-display text-2xl font-semibold">{dia.corridas}</p>
+            {dia.falhas > 0 && (
+              <p className="text-xs text-muted-foreground">{dia.falhas} não entregue(s)</p>
+            )}
+          </div>
+          <div className="panel p-3">
+            <p className="text-xs text-muted-foreground">Taxa a receber</p>
+            <p className="mt-1 font-display text-2xl font-semibold text-success">
+              {brl(dia.taxa)}
+            </p>
+            <p className="text-xs text-muted-foreground">só entregas concluídas</p>
+          </div>
+          <div className="panel col-span-2 flex items-baseline justify-between p-3">
+            <div>
+              <p className="text-xs text-muted-foreground">Dinheiro para acertar</p>
+              <p className="text-xs text-muted-foreground">recebido em espécie</p>
+            </div>
+            <p className="font-display text-xl font-semibold">{brl(dia.especie)}</p>
+          </div>
+        </div>
 
         {done && !isLoading && (
           <div className="panel p-8 text-center">
