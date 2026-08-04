@@ -1,1 +1,7 @@
 project_id = "lvskhbngntvreyagduue"
+
+# A função valida o JWT por conta própria (precisa do token para saber
+# quem chamou e conferir o papel admin), mas manter verify_jwt ligado
+# barra chamada anônima antes mesmo de entrar no código.
+[functions.admin-create-user]
+verify_jwt = true
