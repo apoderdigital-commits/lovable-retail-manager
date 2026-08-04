@@ -657,6 +657,7 @@ export type Database = {
           spend: number
         }[]
       }
+      open_route_for: { Args: { p_courier: string }; Returns: string }
       organic_performance: {
         Args: { p_from: string; p_to: string }
         Returns: {
