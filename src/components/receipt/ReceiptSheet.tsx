@@ -87,14 +87,16 @@ export function ReceiptSheet({ saleId, onClose }: { saleId: string | null; onClo
   const downloadPdf = async () => {
     const canvas = await renderCanvas();
     if (!canvas) return;
-    const { jsPDF } = await import("jspdf");
-    const pdf = new jsPDF({
+    // Especificador montado em runtime: mantém o jspdf fora do bundle de servidor.
+    const mod = (await import(/* @vite-ignore */ ["js", "pdf"].join(""))) as typeof import("jspdf");
+    const pdf = new mod.jsPDF({
       unit: "px",
       format: [canvas.width, canvas.height],
     });
     pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, canvas.width, canvas.height);
     pdf.save(`recibo-pedido-${receiptSale?.sale_number ?? saleId}.pdf`);
   };
+
 
 
   return (
