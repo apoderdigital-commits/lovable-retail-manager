@@ -301,16 +301,18 @@ function MarketingPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.flatMap((r) => {
+            {rows.map((r) => (
+              <TableRow key={`${r.offer_id}-trafego`}>
+                <TableCell className="font-medium">{r.offer_name}</TableCell>
+                <TableCell className="text-muted-foreground">Tráfego</TableCell>
+                <TableCell className="text-right">{r.sales_count}</TableCell>
+                <TableCell className="text-right">{r.customers}</TableCell>
+                <TableCell className="text-right font-medium">{brl(Number(r.revenue))}</TableCell>
+              </TableRow>
+            ))}
+            {rows.map((r) => {
               const m = matchOf(r.offer_id);
-              return [
-                <TableRow key={`${r.offer_id}-trafego`}>
-                  <TableCell className="font-medium">{r.offer_name}</TableCell>
-                  <TableCell className="text-muted-foreground">Tráfego</TableCell>
-                  <TableCell className="text-right">{r.sales_count}</TableCell>
-                  <TableCell className="text-right">{r.customers}</TableCell>
-                  <TableCell className="text-right font-medium">{brl(Number(r.revenue))}</TableCell>
-                </TableRow>,
+              return (
                 <TableRow key={`${r.offer_id}-organico`} className="bg-muted/40">
                   <TableCell className="font-medium">{r.offer_name}</TableCell>
                   <TableCell className="text-muted-foreground">
@@ -323,8 +325,8 @@ function MarketingPage() {
                   <TableCell className="text-right font-medium">
                     {brl(Number(m?.revenue ?? 0))}
                   </TableCell>
-                </TableRow>,
-              ];
+                </TableRow>
+              );
             })}
             {unmatchedOrganicSales > 0 && (
               <TableRow className="bg-muted/40">
