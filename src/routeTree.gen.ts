@@ -22,6 +22,7 @@ import { Route as MarketingRouteImport } from './routes/marketing'
 import { Route as PdvRouteImport } from './routes/pdv'
 import { Route as PedidosRouteImport } from './routes/pedidos'
 import { Route as ProdutosRouteImport } from './routes/produtos'
+import { Route as RastreioRouteImport } from './routes/rastreio'
 import { Route as RelatoriosRouteImport } from './routes/relatorios'
 import { Route as UsuariosRouteImport } from './routes/usuarios'
 
@@ -90,6 +91,11 @@ const ProdutosRoute = ProdutosRouteImport.update({
   path: '/produtos',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RastreioRoute = RastreioRouteImport.update({
+  id: '/rastreio',
+  path: '/rastreio',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RelatoriosRoute = RelatoriosRouteImport.update({
   id: '/relatorios',
   path: '/relatorios',
@@ -115,6 +121,7 @@ export interface FileRoutesByFullPath {
   '/pdv': typeof PdvRoute
   '/pedidos': typeof PedidosRoute
   '/produtos': typeof ProdutosRoute
+  '/rastreio': typeof RastreioRoute
   '/relatorios': typeof RelatoriosRoute
   '/usuarios': typeof UsuariosRoute
 }
@@ -132,6 +139,7 @@ export interface FileRoutesByTo {
   '/pdv': typeof PdvRoute
   '/pedidos': typeof PedidosRoute
   '/produtos': typeof ProdutosRoute
+  '/rastreio': typeof RastreioRoute
   '/relatorios': typeof RelatoriosRoute
   '/usuarios': typeof UsuariosRoute
 }
@@ -150,6 +158,7 @@ export interface FileRoutesById {
   '/pdv': typeof PdvRoute
   '/pedidos': typeof PedidosRoute
   '/produtos': typeof ProdutosRoute
+  '/rastreio': typeof RastreioRoute
   '/relatorios': typeof RelatoriosRoute
   '/usuarios': typeof UsuariosRoute
 }
@@ -169,6 +178,7 @@ export interface FileRouteTypes {
     | '/pdv'
     | '/pedidos'
     | '/produtos'
+    | '/rastreio'
     | '/relatorios'
     | '/usuarios'
   fileRoutesByTo: FileRoutesByTo
@@ -186,6 +196,7 @@ export interface FileRouteTypes {
     | '/pdv'
     | '/pedidos'
     | '/produtos'
+    | '/rastreio'
     | '/relatorios'
     | '/usuarios'
   id:
@@ -203,6 +214,7 @@ export interface FileRouteTypes {
     | '/pdv'
     | '/pedidos'
     | '/produtos'
+    | '/rastreio'
     | '/relatorios'
     | '/usuarios'
   fileRoutesById: FileRoutesById
@@ -221,6 +233,7 @@ export interface RootRouteChildren {
   PdvRoute: typeof PdvRoute
   PedidosRoute: typeof PedidosRoute
   ProdutosRoute: typeof ProdutosRoute
+  RastreioRoute: typeof RastreioRoute
   RelatoriosRoute: typeof RelatoriosRoute
   UsuariosRoute: typeof UsuariosRoute
 }
@@ -318,6 +331,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProdutosRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/rastreio': {
+      id: '/rastreio'
+      path: '/rastreio'
+      fullPath: '/rastreio'
+      preLoaderRoute: typeof RastreioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/relatorios': {
       id: '/relatorios'
       path: '/relatorios'
@@ -349,6 +369,7 @@ const rootRouteChildren: RootRouteChildren = {
   PdvRoute: PdvRoute,
   PedidosRoute: PedidosRoute,
   ProdutosRoute: ProdutosRoute,
+  RastreioRoute: RastreioRoute,
   RelatoriosRoute: RelatoriosRoute,
   UsuariosRoute: UsuariosRoute,
 }

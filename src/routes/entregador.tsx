@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Camera, CalendarClock, XCircle, Flag, MapPin, Check } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -165,6 +165,44 @@ function CourierPage() {
       return data ?? [];
     },
   });
+
+  // manda a posição pro rastreio (/rastreio) enquanto o próprio entregador
+  // tem uma saída despachada em aberto. some sozinho quando encerra a
+  // rota ou fecha a aba — a tela de rastreio percebe pelo silêncio.
+  useEffect(() => {
+    const tracking = user && courierId === user.id && openRoutes.length > 0;
+    if (!tracking || !("geolocation" in navigator)) return;
+
+    let lastSent = 0;
+    const MIN_INTERVAL_MS = 15_000;
+
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const now = Date.now();
+        if (now - lastSent < MIN_INTERVAL_MS) return;
+        lastSent = now;
+        supabase
+          .from("courier_locations")
+          .upsert({
+            courier_id: user!.id,
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracy: pos.coords.accuracy,
+            updated_at: new Date().toISOString(),
+          })
+          .then(({ error }) => {
+            if (error) console.error("courier_locations upsert", error);
+          });
+      },
+      () => {
+        // permissão negada ou GPS indisponível: não trava a tela do
+        // entregador, só deixa de aparecer no rastreio
+      },
+      { enableHighAccuracy: true, maximumAge: 10_000, timeout: 15_000 },
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [user, courierId, openRoutes.length]);
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["my-route"] });
