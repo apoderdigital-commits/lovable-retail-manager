@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Search, PackageCheck, RotateCcw, Ban, Eye } from "lucide-react";
+import { Search, PackageCheck, RotateCcw, Ban, Eye, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
@@ -25,6 +25,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { brl } from "@/lib/format";
+import { ReceiptSheet } from "@/components/receipt/ReceiptSheet";
 import type { Database } from "@/integrations/supabase/types";
 
 type Status = Database["public"]["Enums"]["order_status"];
@@ -75,6 +76,7 @@ function OrdersPage() {
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [printingId, setPrintingId] = useState<string | null>(null);
 
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ["orders", filter],
@@ -192,6 +194,9 @@ function OrdersPage() {
                     <Button variant="ghost" size="icon" onClick={() => setDetailId(o.id)}>
                       <Eye className="size-4" />
                     </Button>
+                    <Button variant="ghost" size="icon" onClick={() => setPrintingId(o.id)}>
+                      <Printer className="size-4" />
+                    </Button>
 
                     {o.status === "new" && (
                       <Button
@@ -271,6 +276,7 @@ function OrdersPage() {
       </Dialog>
 
       <OrderDetail sale={detail} onClose={() => setDetailId(null)} />
+      <ReceiptSheet saleId={printingId} onClose={() => setPrintingId(null)} />
     </AppShell>
   );
 }

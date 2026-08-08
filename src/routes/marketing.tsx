@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { TrendingUp, Sprout } from "lucide-react";
+import { TrendingUp, Sprout, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -61,9 +63,51 @@ const show = (v: number | null, fmt: (n: number) => string) => (v === null ? "�
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
 const mult = (v: number) => `${v.toFixed(2)}×`;
 
+type MetaStatus = { configured: boolean };
+
 function MarketingPage() {
+  const qc = useQueryClient();
   const [from, setFrom] = useState(firstOfMonth);
   const [to, setTo] = useState(today);
+
+  const { data: metaStatus } = useQuery({
+    queryKey: ["meta-status"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("meta_settings_status");
+      if (error) throw error;
+      return data as MetaStatus;
+    },
+  });
+
+  // mesma sincronização de /configuracoes — aqui é onde o desempenho das
+  // ofertas é olhado no dia a dia, então o botão vem junto
+  const sync = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("meta-ads-sync", {
+        body: { days: 30 },
+      });
+      if (error) {
+        let detail = error.message;
+        const res = (error as { context?: Response }).context;
+        if (res?.json) {
+          try {
+            const body = await res.json();
+            if (body?.error) detail = body.error;
+          } catch {
+            // corpo não era JSON
+          }
+        }
+        throw new Error(detail);
+      }
+      return data as { campaigns: number; days: number };
+    },
+    onSuccess: (r) => {
+      toast.success(`${r.campaigns} campanha(s) sincronizada(s)`);
+      qc.invalidateQueries({ queryKey: ["ad-campaigns"] });
+      qc.invalidateQueries({ queryKey: ["marketing"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["marketing", "offers", from, to],
@@ -114,6 +158,14 @@ function MarketingPage() {
           <Label className="text-xs">Até</Label>
           <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
         </div>
+        <Button
+          variant="outline"
+          disabled={!metaStatus?.configured || sync.isPending}
+          onClick={() => sync.mutate()}
+        >
+          <RefreshCw className={`mr-2 size-4 ${sync.isPending ? "animate-spin" : ""}`} />
+          Sincronizar 30 dias
+        </Button>
       </div>
 
       <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -174,7 +226,7 @@ function MarketingPage() {
               <TableRow className="bg-muted/40">
                 <TableCell className="font-medium">
                   <span className="flex items-center gap-1.5">
-                    <Sprout className="size-3.5 text-muted-foreground" /> Orgânico (avulso)
+                    <Sprout className="size-3.5 text-muted-foreground" /> Orgânico
                   </span>
                 </TableCell>
                 <TableCell className="text-right text-muted-foreground">—</TableCell>

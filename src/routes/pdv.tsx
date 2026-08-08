@@ -17,6 +17,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { brl } from "@/lib/format";
+import { CustomerPicker } from "@/components/customer-picker";
+import { ReceiptSheet } from "@/components/receipt/ReceiptSheet";
 
 export const Route = createFileRoute("/pdv")({
   head: () => ({
@@ -58,6 +60,7 @@ function PdvPage() {
   const [discount, setDiscount] = useState("0");
   const [address, setAddress] = useState("");
   const [neighborhood, setNeighborhood] = useState("");
+  const [receiptSaleId, setReceiptSaleId] = useState<string | null>(null);
 
   const { data: products = [] } = useQuery({
     queryKey: ["products"],
@@ -77,7 +80,7 @@ function PdvPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("customers")
-        .select("id, name, customer_type, address, neighborhood")
+        .select("id, name, phone, document, customer_type, address, neighborhood")
         .order("name");
       if (error) throw error;
       return data;
@@ -148,6 +151,14 @@ function PdvPage() {
   const subtotal = offer ? Number(offer.price) : lines.reduce((s, l) => s + l.unit * l.quantity, 0);
   const discountValue = Math.min(Number(discount || 0), subtotal);
   const total = subtotal - discountValue;
+
+  // venda orgânica cujo total bate com uma oferta ativa: pode ter vindo de
+  // campanha e o atendente esqueceu de marcar. só sugere, não força — a
+  // coincidência de valor pode ser mesmo coincidência.
+  const matchedOffer =
+    !offerId && cart.length > 0
+      ? offers.find((o) => o.item_count === units && Math.abs(Number(o.price) - subtotal) < 0.01)
+      : undefined;
 
   const add = (p: (typeof products)[number]) => {
     if (offer && units >= offer.item_count) {
@@ -227,6 +238,7 @@ function PdvPage() {
           ? `Venda #${sale.sale_number} registrada — ${brl(Number(sale.total))}`
           : `Pedido #${sale.sale_number} criado — estoque reservado`,
       );
+      setReceiptSaleId(sale.id);
       reset();
       qc.invalidateQueries({ queryKey: ["products"] });
       qc.invalidateQueries({ queryKey: ["orders"] });
@@ -321,7 +333,7 @@ function PdvPage() {
                     : "text-muted-foreground hover:bg-muted"
                 }`}
               >
-                Avulso
+                Orgânico
               </button>
               {offers.map((o) => (
                 <button
@@ -347,9 +359,18 @@ function PdvPage() {
                 {offerComplete ? " · pode finalizar" : ""}
               </p>
             ) : (
-              <p className="mt-2 text-xs text-muted-foreground">
-                Venda avulsa conta como orgânica, fora do tráfego.
-              </p>
+              <p className="mt-2 text-xs text-muted-foreground">Venda orgânica, fora do tráfego.</p>
+            )}
+            {matchedOffer && (
+              <div className="mt-2 flex items-center justify-between gap-2 rounded-md bg-accent/15 px-2.5 py-2 text-xs">
+                <span>
+                  Esses itens batem com a oferta <strong>{matchedOffer.name}</strong> — classificar
+                  como tráfego?
+                </span>
+                <Button size="sm" variant="outline" onClick={() => setOfferId(matchedOffer.id)}>
+                  Marcar oferta
+                </Button>
+              </div>
             )}
           </div>
 
@@ -389,22 +410,12 @@ function PdvPage() {
               <Label>
                 Cliente {mode === "delivery" && <span className="text-destructive">*</span>}
               </Label>
-              <Select value={customerId} onValueChange={selectCustomer}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none" disabled={mode === "delivery"}>
-                    Consumidor final
-                  </SelectItem>
-                  {customers.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                      {c.customer_type === "wholesale" ? " · atacado" : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <CustomerPicker
+                customers={customers}
+                value={customerId}
+                onChange={selectCustomer}
+                allowNone={mode !== "delivery"}
+              />
               {customerId !== "none" && stats && (
                 <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                   {Number(stats.orders) === 0 ? (
@@ -516,6 +527,7 @@ function PdvPage() {
           </div>
         </section>
       </div>
+      <ReceiptSheet saleId={receiptSaleId} onClose={() => setReceiptSaleId(null)} />
     </AppShell>
   );
 }

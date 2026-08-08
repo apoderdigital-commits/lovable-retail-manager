@@ -1,7 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell, Metric } from "@/components/AppShell";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { brl, dateTime } from "@/lib/format";
 import {
   Table,
@@ -11,6 +14,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+
+const firstOfMonth = () => {
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth(), 1).toLocaleDateString("sv-SE");
+};
+const today = () => new Date().toLocaleDateString("sv-SE");
 
 export const Route = createFileRoute("/relatorios")({
   head: () => ({
@@ -31,22 +40,24 @@ export const Route = createFileRoute("/relatorios")({
 });
 
 function ReportsPage() {
-  const { data } = useQuery({
-    queryKey: ["reports"],
-    queryFn: async () => {
-      const since = new Date();
-      since.setDate(since.getDate() - 30);
+  const [from, setFrom] = useState(firstOfMonth);
+  const [to, setTo] = useState(today);
 
+  const { data } = useQuery({
+    queryKey: ["reports", from, to],
+    queryFn: async () => {
       const [salesRes, itemsRes] = await Promise.all([
         supabase
           .from("sales")
           .select("id, sale_number, total, discount, payment_method, created_at")
-          .gte("created_at", since.toISOString())
+          .gte("created_at", `${from}T00:00:00`)
+          .lte("created_at", `${to}T23:59:59`)
           .order("created_at", { ascending: false }),
         supabase
           .from("sale_items")
           .select("product_name, quantity, total, created_at")
-          .gte("created_at", since.toISOString()),
+          .gte("created_at", `${from}T00:00:00`)
+          .lte("created_at", `${to}T23:59:59`),
       ]);
       if (salesRes.error) throw salesRes.error;
       if (itemsRes.error) throw itemsRes.error;
@@ -79,7 +90,22 @@ function ReportsPage() {
     .slice(0, 8);
 
   return (
-    <AppShell title="Relatórios" subtitle="Últimos 30 dias">
+    <AppShell
+      title="Relatórios"
+      subtitle="Faturamento, ticket médio, formas de pagamento e produtos campeões"
+      actions={
+        <div className="flex items-end gap-2">
+          <div className="space-y-1">
+            <Label className="text-xs">De</Label>
+            <Input type="date" className="h-8" value={from} onChange={(e) => setFrom(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Até</Label>
+            <Input type="date" className="h-8" value={to} onChange={(e) => setTo(e.target.value)} />
+          </div>
+        </div>
+      }
+    >
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="Faturamento" value={brl(revenue)} />
         <Metric label="Vendas" value={String(sales.length)} />

@@ -62,6 +62,23 @@ type RouteSummary = {
   cash_collected: number;
 };
 
+type RangeSummary = {
+  courier_id: string;
+  stops: number;
+  delivered: number;
+  not_delivered: number;
+  pending: number;
+  fee_payable: number;
+  cash_collected: number;
+};
+
+type PaymentBreakdown = {
+  courier_id: string;
+  payment_method: string;
+  transactions: number;
+  amount: number;
+};
+
 // data local no formato YYYY-MM-DD, sem escorregar de fuso
 const todayISO = () => new Date().toLocaleDateString("sv-SE");
 
@@ -325,11 +342,16 @@ function DeliveriesPage() {
               <article key={o.id} className="rounded-lg border border-border bg-background p-3">
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-sm font-medium">{o.customers?.name ?? "Consumidor final"}</p>
-                  {o.customers?.customer_type === "wholesale" && (
-                    <Badge variant="secondary" className="shrink-0 text-[10px]">
-                      atacado
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Badge variant="secondary" className="text-[10px]">
+                      #{o.sale_number}
                     </Badge>
-                  )}
+                    {o.customers?.customer_type === "wholesale" && (
+                      <Badge variant="secondary" className="text-[10px]">
+                        atacado
+                      </Badge>
+                    )}
+                  </div>
                 </div>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   {o.neighborhood ?? "sem bairro"} · {o.payment_method}
@@ -401,6 +423,9 @@ function DeliveriesPage() {
                           {o.neighborhood ?? "sem bairro"}
                         </p>
                       </div>
+                      <Badge variant="secondary" className="shrink-0 text-[10px]">
+                        #{o.sale_number}
+                      </Badge>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -489,7 +514,130 @@ function DeliveriesPage() {
           })}
         </div>
       </div>
+
+      <PeriodSummary couriers={couriers} />
     </AppShell>
+  );
+}
+
+/**
+ * Fila e saídas em andamento são sempre "hoje" — despachar um pedido de
+ * outro dia não faz sentido. Já este resumo é histórico e filtrável, por
+ * isso mora numa seção separada com o próprio controle de período.
+ */
+function PeriodSummary({
+  couriers,
+}: {
+  couriers: { id: string; full_name: string | null; email: string }[];
+}) {
+  const [from, setFrom] = useState(todayISO);
+  const [to, setTo] = useState(todayISO);
+
+  const { data: range = [] } = useQuery({
+    queryKey: ["route-range-summary", from, to],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("route_range_summary", { p_from: from, p_to: to });
+      if (error) throw error;
+      return (data ?? []) as RangeSummary[];
+    },
+  });
+
+  const { data: payments = [] } = useQuery({
+    queryKey: ["route-payment-breakdown", from, to],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("route_payment_breakdown", {
+        p_from: from,
+        p_to: to,
+      });
+      if (error) throw error;
+      return (data ?? []) as PaymentBreakdown[];
+    },
+  });
+
+  const totals = range.reduce(
+    (acc, r) => ({
+      delivered: acc.delivered + Number(r.delivered),
+      notDelivered: acc.notDelivered + Number(r.not_delivered),
+      fee: acc.fee + Number(r.fee_payable),
+    }),
+    { delivered: 0, notDelivered: 0, fee: 0 },
+  );
+  const apurado = payments.reduce((s, p) => s + Number(p.amount), 0);
+
+  const nameOf = (id: string) => {
+    const c = couriers.find((x) => x.id === id);
+    return c?.full_name || c?.email || "—";
+  };
+
+  return (
+    <section className="panel mt-4">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
+        <h2 className="text-sm font-semibold">Resumo do período</h2>
+        <div className="flex items-end gap-2">
+          <div className="space-y-1">
+            <Label className="text-xs">De</Label>
+            <Input
+              type="date"
+              className="h-8"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Até</Label>
+            <Input type="date" className="h-8" value={to} onChange={(e) => setTo(e.target.value)} />
+          </div>
+        </div>
+      </header>
+
+      <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Metric label="Entregues" value={String(totals.delivered)} />
+        <Metric
+          label="Não entregues"
+          value={String(totals.notDelivered)}
+          tone={totals.notDelivered > 0 ? "warning" : "default"}
+        />
+        <Metric label="Taxa total" value={brl(totals.fee)} tone="accent" />
+        <Metric label="Total apurado" value={brl(apurado)} hint="todas as formas de pagamento" />
+      </div>
+
+      <div className="grid gap-3 border-t border-border p-4 sm:grid-cols-2 xl:grid-cols-3">
+        {range.map((r) => {
+          const meus = payments.filter((p) => p.courier_id === r.courier_id);
+          const meuApurado = meus.reduce((s, p) => s + Number(p.amount), 0);
+          return (
+            <div key={r.courier_id} className="rounded-lg border border-border p-3">
+              <p className="text-sm font-semibold">{nameOf(r.courier_id)}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {r.delivered} entregue(s) · taxa {brl(Number(r.fee_payable))}
+              </p>
+              <div className="mt-2 space-y-1">
+                {meus.map((p) => (
+                  <div key={p.payment_method} className="flex justify-between text-xs">
+                    <span className="capitalize text-muted-foreground">
+                      {p.payment_method} · {p.transactions}x
+                    </span>
+                    <span className="font-medium">{brl(Number(p.amount))}</span>
+                  </div>
+                ))}
+                {meus.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Sem entregas no período.</p>
+                )}
+              </div>
+              <div className="mt-2 flex justify-between border-t border-border pt-1.5 text-xs font-semibold">
+                <span>Apurado</span>
+                <span>{brl(meuApurado)}</span>
+              </div>
+            </div>
+          );
+        })}
+        {range.length === 0 && (
+          <p className="col-span-full py-6 text-center text-sm text-muted-foreground">
+            Nenhum motoboy com rota no período.
+          </p>
+        )}
+      </div>
+    </section>
   );
 }
 

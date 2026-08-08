@@ -125,6 +125,31 @@ function CourierPage() {
     { corridas: 0, falhas: 0, taxa: 0, especie: 0 },
   );
 
+  // quebra do que já foi entregue hoje por forma de pagamento — é o número
+  // que o entregador confere na hora de acertar com a loja
+  const { data: payments = [] } = useQuery({
+    queryKey: ["my-payments", courierId],
+    enabled: !!courierId,
+    queryFn: async () => {
+      const today = todayISO();
+      const { data, error } = await supabase.rpc("route_payment_breakdown", {
+        p_from: today,
+        p_to: today,
+      });
+      if (error) throw error;
+      return (
+        (data ?? []) as {
+          courier_id: string;
+          payment_method: string;
+          transactions: number;
+          amount: number;
+        }[]
+      ).filter((p) => p.courier_id === courierId);
+    },
+  });
+
+  const apurado = payments.reduce((s, p) => s + Number(p.amount), 0);
+
   // o entregador pode ter mais de uma saída aberta no mesmo dia
   const { data: openRoutes = [] } = useQuery({
     queryKey: ["my-route-header", courierId],
@@ -146,6 +171,7 @@ function CourierPage() {
     // sem isto o painel do topo não mexe ao confirmar entrega, que é
     // exatamente quando o entregador olha para ele
     qc.invalidateQueries({ queryKey: ["my-summary"] });
+    qc.invalidateQueries({ queryKey: ["my-payments"] });
     qc.invalidateQueries({ queryKey: ["route-summary"] });
     qc.invalidateQueries({ queryKey: ["dispatch"] });
     qc.invalidateQueries({ queryKey: ["orders"] });
@@ -218,6 +244,28 @@ function CourierPage() {
             <p className="font-display text-xl font-semibold">{brl(dia.especie)}</p>
           </div>
         </div>
+
+        {payments.length > 0 && (
+          <div className="panel p-3">
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Transações do dia por forma de pagamento
+            </p>
+            <div className="space-y-1.5">
+              {payments.map((p) => (
+                <div key={p.payment_method} className="flex items-center justify-between text-sm">
+                  <span className="capitalize text-muted-foreground">
+                    {p.payment_method} · {p.transactions} transação(ões)
+                  </span>
+                  <span className="font-medium">{brl(Number(p.amount))}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 flex items-center justify-between border-t border-border pt-2 text-sm font-semibold">
+              <span>Total apurado</span>
+              <span>{brl(apurado)}</span>
+            </div>
+          </div>
+        )}
 
         {done && !isLoading && (
           <div className="panel p-8 text-center">

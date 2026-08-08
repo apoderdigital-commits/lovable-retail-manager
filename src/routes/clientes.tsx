@@ -59,6 +59,7 @@ type Form = {
   phone: string;
   email: string;
   document: string;
+  birth_date: string;
   customer_type: "retail" | "wholesale";
   zip_code: string;
   address: string;
@@ -73,6 +74,7 @@ const empty: Form = {
   phone: "",
   email: "",
   document: "",
+  birth_date: "",
   customer_type: "retail",
   zip_code: "",
   address: "",
@@ -87,6 +89,7 @@ const schema = z.object({
   phone: z.string().trim().max(30),
   email: z.union([z.string().trim().email({ message: "E-mail inválido" }).max(255), z.literal("")]),
   document: z.string().trim().max(30),
+  birth_date: z.union([z.string().trim().date(), z.literal("")]),
   customer_type: z.enum(["retail", "wholesale"]),
   zip_code: z.string().trim().max(12),
   address: z.string().trim().max(200),
@@ -150,6 +153,7 @@ function CustomersPage() {
         phone: parsed.data.phone || null,
         email: parsed.data.email || null,
         document: parsed.data.document || null,
+        birth_date: parsed.data.birth_date || null,
         customer_type: parsed.data.customer_type,
         zip_code: parsed.data.zip_code || null,
         address: parsed.data.address || null,
@@ -254,6 +258,14 @@ function CustomersPage() {
                   type="email"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Aniversário</Label>
+                <Input
+                  type="date"
+                  value={form.birth_date}
+                  onChange={(e) => setForm({ ...form, birth_date: e.target.value })}
                 />
               </div>
             </div>
@@ -377,6 +389,7 @@ function CustomersPage() {
                         phone: c.phone ?? "",
                         email: c.email ?? "",
                         document: c.document ?? "",
+                        birth_date: c.birth_date ?? "",
                         customer_type: c.customer_type ?? "retail",
                         zip_code: c.zip_code ?? "",
                         address: c.address ?? "",
