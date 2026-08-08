@@ -66,6 +66,7 @@ export function ReceiptSheet({ saleId, onClose }: { saleId: string | null; onClo
 
   const renderCanvas = async () => {
     if (!receiptRef.current) return null;
+    const { default: html2canvas } = await import("html2canvas");
     return html2canvas(receiptRef.current, { backgroundColor: "#ffffff", scale: 2 });
   };
 
@@ -73,7 +74,7 @@ export function ReceiptSheet({ saleId, onClose }: { saleId: string | null; onClo
     try {
       const canvas = await renderCanvas();
       if (!canvas) return;
-      canvas.toBlob(async (blob) => {
+      canvas.toBlob(async (blob: Blob | null) => {
         if (!blob) return;
         await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
         toast.success("Recibo copiado como imagem");
@@ -86,6 +87,7 @@ export function ReceiptSheet({ saleId, onClose }: { saleId: string | null; onClo
   const downloadPdf = async () => {
     const canvas = await renderCanvas();
     if (!canvas) return;
+    const { jsPDF } = await import("jspdf");
     const pdf = new jsPDF({
       unit: "px",
       format: [canvas.width, canvas.height],
@@ -93,6 +95,7 @@ export function ReceiptSheet({ saleId, onClose }: { saleId: string | null; onClo
     pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, canvas.width, canvas.height);
     pdf.save(`recibo-pedido-${receiptSale?.sale_number ?? saleId}.pdf`);
   };
+
 
   return (
     <Sheet open={!!saleId} onOpenChange={(v) => !v && onClose()}>
