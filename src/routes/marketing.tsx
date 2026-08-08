@@ -42,6 +42,14 @@ type Row = {
   customers: number;
 };
 
+type OrganicMatch = {
+  offer_id: string;
+  offer_name: string;
+  sales_count: number;
+  revenue: number;
+  customers: number;
+};
+
 type Ltv = {
   offer_id: string | null;
   offer_name: string;
@@ -133,6 +141,20 @@ function MarketingPage() {
     },
   });
 
+  // venda orgânica cujo valor e quantidade batem com uma oferta ativa —
+  // mesma regra do PDV, só que rodada no banco pra cobrir o histórico
+  const { data: organicMatch = [] } = useQuery({
+    queryKey: ["marketing", "organic-match", from, to],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("organic_offer_match", {
+        p_from: from,
+        p_to: to,
+      });
+      if (error) throw error;
+      return (data ?? []) as OrganicMatch[];
+    },
+  });
+
   const { data: ltv = [] } = useQuery({
     queryKey: ["marketing", "ltv"],
     queryFn: async () => {
@@ -145,7 +167,16 @@ function MarketingPage() {
   const spend = rows.reduce((s, r) => s + Number(r.spend), 0);
   const revenue = rows.reduce((s, r) => s + Number(r.revenue), 0);
   const sales = rows.reduce((s, r) => s + Number(r.sales_count), 0);
+  const organicSales = Number(organic?.sales_count ?? 0);
   const organicRevenue = Number(organic?.revenue ?? 0);
+
+  const matchOf = (offerId: string) => organicMatch.find((m) => m.offer_id === offerId);
+  // parte do orgânico que bate em valor/quantidade com uma oferta; o resto
+  // é venda avulsa "de verdade", sem coincidir com nenhum kit
+  const matchedOrganicSales = organicMatch.reduce((s, m) => s + Number(m.sales_count), 0);
+  const matchedOrganicRevenue = organicMatch.reduce((s, m) => s + Number(m.revenue), 0);
+  const unmatchedOrganicSales = Math.max(0, organicSales - matchedOrganicSales);
+  const unmatchedOrganicRevenue = Math.max(0, organicRevenue - matchedOrganicRevenue);
 
   return (
     <AppShell title="Marketing" subtitle="Campanhas cruzadas com as vendas de cada oferta">
@@ -168,19 +199,37 @@ function MarketingPage() {
         </Button>
       </div>
 
-      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Tile label="Investido" value={brl(spend)} />
-        <Tile label="Faturamento de campanha" value={brl(revenue)} />
-        <Tile
-          label="ROAS geral"
-          value={show(per(revenue, spend), mult)}
-          hint={spend === 0 ? "sem gasto no período" : "retorno sobre o anúncio"}
-        />
-        <Tile
-          label="Custo por venda"
-          value={show(per(spend, sales), brl)}
-          hint={`${sales} venda(s) de oferta`}
-        />
+      <div className="mb-4 grid gap-4 lg:grid-cols-2">
+        <div className="rounded-xl border border-border p-4">
+          <h2 className="mb-3 text-sm font-semibold">Venda tráfego</h2>
+          <div className="grid grid-cols-2 gap-3">
+            <Tile label="Investido" value={brl(spend)} />
+            <Tile label="Faturamento" value={brl(revenue)} />
+            <Tile
+              label="ROAS geral"
+              value={show(per(revenue, spend), mult)}
+              hint={spend === 0 ? "sem gasto no período" : "retorno sobre o anúncio"}
+            />
+            <Tile
+              label="Custo por venda"
+              value={show(per(spend, sales), brl)}
+              hint={`${sales} venda(s)`}
+            />
+          </div>
+        </div>
+        <div className="rounded-xl border border-border p-4">
+          <h2 className="mb-3 text-sm font-semibold">Venda orgânica</h2>
+          <div className="grid grid-cols-2 gap-3">
+            <Tile label="Vendas" value={String(organicSales)} />
+            <Tile label="Faturamento" value={brl(organicRevenue)} />
+            <Tile label="Clientes" value={String(organic?.customers ?? 0)} />
+            <Tile
+              label="Ticket médio"
+              value={show(per(organicRevenue, organicSales), brl)}
+              hint={`${organicSales} venda(s)`}
+            />
+          </div>
+        </div>
       </div>
 
       <div className="panel mb-4 overflow-x-auto">
@@ -222,25 +271,77 @@ function MarketingPage() {
                 </TableCell>
               </TableRow>
             ))}
-            {organic && (
-              <TableRow className="bg-muted/40">
-                <TableCell className="font-medium">
-                  <span className="flex items-center gap-1.5">
-                    <Sprout className="size-3.5 text-muted-foreground" /> Orgânico
-                  </span>
-                </TableCell>
-                <TableCell className="text-right text-muted-foreground">—</TableCell>
-                <TableCell className="text-right text-muted-foreground">—</TableCell>
-                <TableCell className="text-right">{organic.sales_count}</TableCell>
-                <TableCell className="text-right text-muted-foreground">—</TableCell>
-                <TableCell className="text-right text-muted-foreground">—</TableCell>
-                <TableCell className="text-right font-medium">{brl(organicRevenue)}</TableCell>
-                <TableCell className="text-right text-muted-foreground">—</TableCell>
-              </TableRow>
-            )}
             {rows.length === 0 && !isLoading && (
               <TableRow>
                 <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                  Nenhuma oferta ativa.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      <div className="panel mb-4 overflow-x-auto">
+        <div className="border-b border-border px-4 py-3">
+          <h2 className="text-sm font-semibold">Vendas por oferta e origem</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Orgânico entra aqui quando a quantidade de itens e o valor da venda batem com a oferta
+            — mesmo sem ter vindo de anúncio.
+          </p>
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Oferta</TableHead>
+              <TableHead>Origem</TableHead>
+              <TableHead className="text-right">Vendas</TableHead>
+              <TableHead className="text-right">Clientes</TableHead>
+              <TableHead className="text-right">Faturamento</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.flatMap((r) => {
+              const m = matchOf(r.offer_id);
+              return [
+                <TableRow key={`${r.offer_id}-trafego`}>
+                  <TableCell className="font-medium">{r.offer_name}</TableCell>
+                  <TableCell className="text-muted-foreground">Tráfego</TableCell>
+                  <TableCell className="text-right">{r.sales_count}</TableCell>
+                  <TableCell className="text-right">{r.customers}</TableCell>
+                  <TableCell className="text-right font-medium">{brl(Number(r.revenue))}</TableCell>
+                </TableRow>,
+                <TableRow key={`${r.offer_id}-organico`} className="bg-muted/40">
+                  <TableCell className="font-medium">{r.offer_name}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    <span className="flex items-center gap-1.5">
+                      <Sprout className="size-3.5" /> Orgânico
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right">{m?.sales_count ?? 0}</TableCell>
+                  <TableCell className="text-right">{m?.customers ?? 0}</TableCell>
+                  <TableCell className="text-right font-medium">
+                    {brl(Number(m?.revenue ?? 0))}
+                  </TableCell>
+                </TableRow>,
+              ];
+            })}
+            {unmatchedOrganicSales > 0 && (
+              <TableRow className="bg-muted/40">
+                <TableCell className="font-medium text-muted-foreground">Sem oferta correspondente</TableCell>
+                <TableCell className="text-muted-foreground">
+                  <span className="flex items-center gap-1.5">
+                    <Sprout className="size-3.5" /> Orgânico
+                  </span>
+                </TableCell>
+                <TableCell className="text-right">{unmatchedOrganicSales}</TableCell>
+                <TableCell className="text-right text-muted-foreground">—</TableCell>
+                <TableCell className="text-right font-medium">{brl(unmatchedOrganicRevenue)}</TableCell>
+              </TableRow>
+            )}
+            {rows.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
                   Nenhuma oferta ativa.
                 </TableCell>
               </TableRow>
