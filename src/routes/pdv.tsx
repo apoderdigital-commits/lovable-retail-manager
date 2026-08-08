@@ -39,6 +39,7 @@ export const Route = createFileRoute("/pdv")({
 });
 
 type Mode = "counter" | "delivery";
+type Origin = "organic" | "traffic";
 
 // dias inteiros desde a data, para o "última há N dias"
 const dias = (iso: string) =>
@@ -53,8 +54,9 @@ function PdvPage() {
   // guarda só id e quantidade: o preço é derivado do tipo do cliente,
   // então trocar o cliente reprecifica o carrinho inteiro sozinho
   const [cart, setCart] = useState<{ productId: string; quantity: number }[]>([]);
-  // null = venda avulsa (orgânica). com oferta = veio de campanha.
-  const [offerId, setOfferId] = useState<string | null>(null);
+  // orgânico = venda direta. tráfego = veio de campanha — qual campanha
+  // exatamente é descoberto pelo valor do carrinho, não escolhido à mão.
+  const [origin, setOrigin] = useState<Origin>("organic");
   const [customerId, setCustomerId] = useState("none");
   const [payment, setPayment] = useState("dinheiro");
   const [discount, setDiscount] = useState("0");
@@ -114,13 +116,11 @@ function PdvPage() {
 
   const customer = customers.find((c) => c.id === customerId) ?? null;
   const isWholesale = customer?.customer_type === "wholesale";
-  const offer = offers.find((o) => o.id === offerId) ?? null;
 
-  // dentro da oferta cada slot vale o mesmo; fora dela vale a tabela do cliente
+  // preço sempre vem da tabela do cliente — oferta não muda o preço, só
+  // classifica de onde a venda veio
   const priceOf = (p: (typeof products)[number]) =>
-    offer
-      ? Number(offer.price) / offer.item_count
-      : Number(isWholesale ? p.wholesale_price : p.price);
+    Number(isWholesale ? p.wholesale_price : p.price);
 
   const selectCustomer = (id: string) => {
     setCustomerId(id);
@@ -145,26 +145,20 @@ function PdvPage() {
   });
 
   const units = cart.reduce((s, i) => s + i.quantity, 0);
-  const offerComplete = offer ? units === offer.item_count : true;
 
-  // com oferta o preço é fechado, não a soma dos itens
-  const subtotal = offer ? Number(offer.price) : lines.reduce((s, l) => s + l.unit * l.quantity, 0);
+  const subtotal = lines.reduce((s, l) => s + l.unit * l.quantity, 0);
   const discountValue = Math.min(Number(discount || 0), subtotal);
   const total = subtotal - discountValue;
 
-  // venda orgânica cujo total bate com uma oferta ativa: pode ter vindo de
-  // campanha e o atendente esqueceu de marcar. só sugere, não força — a
-  // coincidência de valor pode ser mesmo coincidência.
+  // qual oferta esse carrinho representa, descoberto pela combinação de
+  // quantidade de itens e valor total — "4 itens por R$100" só bate se os
+  // dois baterem, não só o valor
   const matchedOffer =
-    !offerId && cart.length > 0
+    cart.length > 0
       ? offers.find((o) => o.item_count === units && Math.abs(Number(o.price) - subtotal) < 0.01)
       : undefined;
 
   const add = (p: (typeof products)[number]) => {
-    if (offer && units >= offer.item_count) {
-      toast.error(`A oferta ${offer.name} leva ${offer.item_count} itens`);
-      return;
-    }
     const inCart = cart.find((i) => i.productId === p.id)?.quantity ?? 0;
     if (inCart >= (p.available_stock ?? 0)) {
       toast.error(
@@ -199,17 +193,11 @@ function PdvPage() {
 
   const reset = () => {
     setCart([]);
-    setOfferId(null);
+    setOrigin("organic");
     setDiscount("0");
     setCustomerId("none");
     setAddress("");
     setNeighborhood("");
-  };
-
-  // trocar de oferta muda quantos itens cabem, então o carrinho recomeça
-  const selectOffer = (id: string | null) => {
-    setOfferId(id);
-    setCart([]);
   };
 
   const finish = useMutation({
@@ -224,7 +212,7 @@ function PdvPage() {
         p_items: cart.map((i) => ({ product_id: i.productId, quantity: i.quantity })),
         ...(addr ? { p_address: addr } : {}),
         ...(hood ? { p_neighborhood: hood } : {}),
-        ...(offerId ? { p_offer: offerId } : {}),
+        ...(origin === "traffic" && matchedOffer ? { p_offer: matchedOffer.id } : {}),
         p_discount: discountValue,
         p_counter_sale: counterSale,
       });
@@ -250,15 +238,20 @@ function PdvPage() {
 
   const missingCustomer = mode === "delivery" && customerId === "none";
   const missingAddress = mode === "delivery" && !address.trim();
+  const missingOfferMatch = origin === "traffic" && !matchedOffer;
   const blocked =
-    finish.isPending || cart.length === 0 || !offerComplete || missingCustomer || missingAddress;
+    finish.isPending ||
+    cart.length === 0 ||
+    missingOfferMatch ||
+    missingCustomer ||
+    missingAddress;
 
   return (
     <AppShell
       title="Nova venda"
       subtitle={
-        offer
-          ? `${offer.name} · ${brl(Number(offer.price) / offer.item_count)} por item`
+        origin === "traffic" && matchedOffer
+          ? `${matchedOffer.name} · tráfego`
           : isWholesale
             ? "Preços de atacado aplicados"
             : "Preços de varejo"
@@ -324,53 +317,40 @@ function PdvPage() {
           </header>
 
           <div className="border-b border-border p-3">
-            <div className="flex flex-wrap gap-1.5">
-              <button
-                onClick={() => selectOffer(null)}
-                className={`rounded-md px-3 py-1.5 text-xs transition-colors ${
-                  !offerId
-                    ? "bg-secondary font-medium text-secondary-foreground"
-                    : "text-muted-foreground hover:bg-muted"
-                }`}
-              >
-                Orgânico
-              </button>
-              {offers.map((o) => (
+            <div className="flex gap-1.5">
+              {(
+                [
+                  { v: "organic", label: "Orgânico" },
+                  { v: "traffic", label: "Tráfego" },
+                ] as const
+              ).map((t) => (
                 <button
-                  key={o.id}
-                  onClick={() => selectOffer(o.id)}
+                  key={t.v}
+                  onClick={() => setOrigin(t.v)}
                   className={`rounded-md px-3 py-1.5 text-xs transition-colors ${
-                    offerId === o.id
+                    origin === t.v
                       ? "bg-accent font-medium text-accent-foreground"
                       : "text-muted-foreground hover:bg-muted"
                   }`}
                 >
-                  {o.name}
+                  {t.label}
                 </button>
               ))}
             </div>
-            {offer ? (
-              <p
-                className={`mt-2 text-xs ${
-                  offerComplete ? "text-success" : "text-muted-foreground"
-                }`}
-              >
-                {units} de {offer.item_count} itens escolhidos
-                {offerComplete ? " · pode finalizar" : ""}
-              </p>
+            {origin === "traffic" ? (
+              matchedOffer ? (
+                <p className="mt-2 text-xs text-success">
+                  Bate com a oferta <strong>{matchedOffer.name}</strong> — {units} item(ns) ·{" "}
+                  {brl(subtotal)}.
+                </p>
+              ) : (
+                <p className="mt-2 text-xs text-warning">
+                  O valor precisa bater com uma oferta ativa (ex.: 4 itens por R$ 100 ou 10 por
+                  R$ 200) para contar como tráfego. Ajuste os itens ou marque como Orgânico.
+                </p>
+              )
             ) : (
               <p className="mt-2 text-xs text-muted-foreground">Venda orgânica, fora do tráfego.</p>
-            )}
-            {matchedOffer && (
-              <div className="mt-2 flex items-center justify-between gap-2 rounded-md bg-accent/15 px-2.5 py-2 text-xs">
-                <span>
-                  Esses itens batem com a oferta <strong>{matchedOffer.name}</strong> — classificar
-                  como tráfego?
-                </span>
-                <Button size="sm" variant="outline" onClick={() => setOfferId(matchedOffer.id)}>
-                  Marcar oferta
-                </Button>
-              </div>
             )}
           </div>
 
@@ -487,7 +467,7 @@ function PdvPage() {
 
             <div className="rounded-lg bg-secondary p-3 text-sm">
               <div className="flex justify-between text-muted-foreground">
-                <span>{offer ? offer.name : "Subtotal"}</span>
+                <span>{origin === "traffic" && matchedOffer ? matchedOffer.name : "Subtotal"}</span>
                 <span>{brl(subtotal)}</span>
               </div>
               <div className="flex justify-between text-muted-foreground">

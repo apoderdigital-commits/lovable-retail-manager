@@ -1,19 +1,16 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, UserPlus } from "lucide-react";
+import { UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Combobox } from "@/components/ui/combobox";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  CustomerFormFields,
+  customerPayload,
+  emptyCustomerForm,
+  type CustomerFormValues,
+} from "@/components/customer-form";
 import {
   Dialog,
   DialogContent,
@@ -33,8 +30,8 @@ type Customer = {
 /**
  * Busca de cliente para o PDV: acha por nome, telefone ou documento, e tem
  * uma saída rápida para cadastrar quem chegou pela primeira vez sem sair da
- * tela de venda. Cadastro completo (endereço, observações) continua em
- * /clientes — aqui é só o mínimo pra fechar a venda.
+ * tela de venda — mesmo formulário completo de /clientes, porque cadastro
+ * pela metade só vira ligação do motoboy perdido na rua depois.
  */
 export function CustomerPicker({
   customers,
@@ -51,7 +48,7 @@ export function CustomerPicker({
 }) {
   const qc = useQueryClient();
   const [quickAdd, setQuickAdd] = useState(false);
-  const [form, setForm] = useState({ name: "", phone: "", customer_type: "retail" as "retail" | "wholesale" });
+  const [form, setForm] = useState<CustomerFormValues>(emptyCustomerForm);
 
   const options = [
     ...(allowNone ? [{ value: "none", label: noneLabel }] : []),
@@ -64,16 +61,8 @@ export function CustomerPicker({
 
   const create = useMutation({
     mutationFn: async () => {
-      if (!form.name.trim()) throw new Error("Informe o nome do cliente");
-      const { data, error } = await supabase
-        .from("customers")
-        .insert({
-          name: form.name.trim(),
-          phone: form.phone.trim() || null,
-          customer_type: form.customer_type,
-        })
-        .select()
-        .single();
+      const payload = customerPayload(form);
+      const { data, error } = await supabase.from("customers").insert(payload).select().single();
       if (error) throw error;
       return data;
     },
@@ -82,7 +71,7 @@ export function CustomerPicker({
       qc.invalidateQueries({ queryKey: ["customers"] });
       onChange(customer.id);
       setQuickAdd(false);
-      setForm({ name: "", phone: "", customer_type: "retail" });
+      setForm(emptyCustomerForm);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -109,44 +98,16 @@ export function CustomerPicker({
       />
 
       <Dialog open={quickAdd} onOpenChange={setQuickAdd}>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Novo cliente</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label>Nome</Label>
-              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Telefone / WhatsApp</Label>
-              <Input
-                value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Tipo</Label>
-              <Select
-                value={form.customer_type}
-                onValueChange={(v) => setForm({ ...form, customer_type: v as "retail" | "wholesale" })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="retail">Varejo</SelectItem>
-                  <SelectItem value="wholesale">Atacado</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Endereço e outros dados podem ser completados depois em Clientes.
-            </p>
-          </div>
+
+          <CustomerFormFields form={form} onChange={setForm} />
+
           <DialogFooter>
             <Button disabled={create.isPending} onClick={() => create.mutate()}>
-              <Plus className="mr-2 size-4" /> Cadastrar e selecionar
+              Cadastrar e selecionar
             </Button>
           </DialogFooter>
         </DialogContent>
