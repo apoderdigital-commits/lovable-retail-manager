@@ -1,7 +1,5 @@
 import { useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import html2canvas from "html2canvas";
-import { jsPDF } from "jspdf";
 import { useReactToPrint } from "react-to-print";
 import { Copy, Download, Printer } from "lucide-react";
 import { toast } from "sonner";
