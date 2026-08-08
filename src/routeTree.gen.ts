@@ -13,12 +13,12 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ClientesRouteImport } from './routes/clientes'
 import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
+import { Route as CustosRouteImport } from './routes/custos'
 import { Route as EntregadorRouteImport } from './routes/entregador'
 import { Route as EntregasRouteImport } from './routes/entregas'
 import { Route as EntregasDashboardRouteImport } from './routes/entregas-dashboard'
-import { Route as MarketingRouteImport } from './routes/marketing'
 import { Route as FinanceiroRouteImport } from './routes/financeiro'
-import { Route as CustosRouteImport } from './routes/custos'
+import { Route as MarketingRouteImport } from './routes/marketing'
 import { Route as PdvRouteImport } from './routes/pdv'
 import { Route as PedidosRouteImport } from './routes/pedidos'
 import { Route as ProdutosRouteImport } from './routes/produtos'
@@ -45,6 +45,11 @@ const ConfiguracoesRoute = ConfiguracoesRouteImport.update({
   path: '/configuracoes',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CustosRoute = CustosRouteImport.update({
+  id: '/custos',
+  path: '/custos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EntregadorRoute = EntregadorRouteImport.update({
   id: '/entregador',
   path: '/entregador',
@@ -58,6 +63,11 @@ const EntregasRoute = EntregasRouteImport.update({
 const EntregasDashboardRoute = EntregasDashboardRouteImport.update({
   id: '/entregas-dashboard',
   path: '/entregas-dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FinanceiroRoute = FinanceiroRouteImport.update({
+  id: '/financeiro',
+  path: '/financeiro',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MarketingRoute = MarketingRouteImport.update({
@@ -96,12 +106,12 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/clientes': typeof ClientesRoute
   '/configuracoes': typeof ConfiguracoesRoute
+  '/custos': typeof CustosRoute
   '/entregador': typeof EntregadorRoute
   '/entregas': typeof EntregasRoute
   '/entregas-dashboard': typeof EntregasDashboardRoute
-  '/marketing': typeof MarketingRoute
   '/financeiro': typeof FinanceiroRoute
-  '/custos': typeof CustosRoute
+  '/marketing': typeof MarketingRoute
   '/pdv': typeof PdvRoute
   '/pedidos': typeof PedidosRoute
   '/produtos': typeof ProdutosRoute
@@ -113,12 +123,12 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/clientes': typeof ClientesRoute
   '/configuracoes': typeof ConfiguracoesRoute
+  '/custos': typeof CustosRoute
   '/entregador': typeof EntregadorRoute
   '/entregas': typeof EntregasRoute
   '/entregas-dashboard': typeof EntregasDashboardRoute
-  '/marketing': typeof MarketingRoute
   '/financeiro': typeof FinanceiroRoute
-  '/custos': typeof CustosRoute
+  '/marketing': typeof MarketingRoute
   '/pdv': typeof PdvRoute
   '/pedidos': typeof PedidosRoute
   '/produtos': typeof ProdutosRoute
@@ -131,12 +141,12 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/clientes': typeof ClientesRoute
   '/configuracoes': typeof ConfiguracoesRoute
+  '/custos': typeof CustosRoute
   '/entregador': typeof EntregadorRoute
   '/entregas': typeof EntregasRoute
   '/entregas-dashboard': typeof EntregasDashboardRoute
-  '/marketing': typeof MarketingRoute
   '/financeiro': typeof FinanceiroRoute
-  '/custos': typeof CustosRoute
+  '/marketing': typeof MarketingRoute
   '/pdv': typeof PdvRoute
   '/pedidos': typeof PedidosRoute
   '/produtos': typeof ProdutosRoute
@@ -150,12 +160,12 @@ export interface FileRouteTypes {
     | '/auth'
     | '/clientes'
     | '/configuracoes'
+    | '/custos'
     | '/entregador'
     | '/entregas'
     | '/entregas-dashboard'
-    | '/marketing'
     | '/financeiro'
-    | '/custos'
+    | '/marketing'
     | '/pdv'
     | '/pedidos'
     | '/produtos'
@@ -167,12 +177,12 @@ export interface FileRouteTypes {
     | '/auth'
     | '/clientes'
     | '/configuracoes'
+    | '/custos'
     | '/entregador'
     | '/entregas'
     | '/entregas-dashboard'
-    | '/marketing'
     | '/financeiro'
-    | '/custos'
+    | '/marketing'
     | '/pdv'
     | '/pedidos'
     | '/produtos'
@@ -184,12 +194,12 @@ export interface FileRouteTypes {
     | '/auth'
     | '/clientes'
     | '/configuracoes'
+    | '/custos'
     | '/entregador'
     | '/entregas'
     | '/entregas-dashboard'
-    | '/marketing'
     | '/financeiro'
-    | '/custos'
+    | '/marketing'
     | '/pdv'
     | '/pedidos'
     | '/produtos'
@@ -202,12 +212,12 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   ClientesRoute: typeof ClientesRoute
   ConfiguracoesRoute: typeof ConfiguracoesRoute
+  CustosRoute: typeof CustosRoute
   EntregadorRoute: typeof EntregadorRoute
   EntregasRoute: typeof EntregasRoute
   EntregasDashboardRoute: typeof EntregasDashboardRoute
-  MarketingRoute: typeof MarketingRoute
   FinanceiroRoute: typeof FinanceiroRoute
-  CustosRoute: typeof CustosRoute
+  MarketingRoute: typeof MarketingRoute
   PdvRoute: typeof PdvRoute
   PedidosRoute: typeof PedidosRoute
   ProdutosRoute: typeof ProdutosRoute
@@ -245,6 +255,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConfiguracoesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/custos': {
+      id: '/custos'
+      path: '/custos'
+      fullPath: '/custos'
+      preLoaderRoute: typeof CustosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/entregador': {
       id: '/entregador'
       path: '/entregador'
@@ -264,6 +281,13 @@ declare module '@tanstack/react-router' {
       path: '/entregas-dashboard'
       fullPath: '/entregas-dashboard'
       preLoaderRoute: typeof EntregasDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/financeiro': {
+      id: '/financeiro'
+      path: '/financeiro'
+      fullPath: '/financeiro'
+      preLoaderRoute: typeof FinanceiroRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/marketing': {
@@ -316,12 +340,12 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   ClientesRoute: ClientesRoute,
   ConfiguracoesRoute: ConfiguracoesRoute,
+  CustosRoute: CustosRoute,
   EntregadorRoute: EntregadorRoute,
   EntregasRoute: EntregasRoute,
   EntregasDashboardRoute: EntregasDashboardRoute,
-  MarketingRoute: MarketingRoute,
   FinanceiroRoute: FinanceiroRoute,
-  CustosRoute: CustosRoute,
+  MarketingRoute: MarketingRoute,
   PdvRoute: PdvRoute,
   PedidosRoute: PedidosRoute,
   ProdutosRoute: ProdutosRoute,
@@ -331,3 +355,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

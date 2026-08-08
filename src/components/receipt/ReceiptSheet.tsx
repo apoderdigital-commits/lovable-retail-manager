@@ -1,7 +1,5 @@
 import { useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import html2canvas from "html2canvas";
-import { jsPDF } from "jspdf";
 import { useReactToPrint } from "react-to-print";
 import { Copy, Download, Printer } from "lucide-react";
 import { toast } from "sonner";
@@ -68,6 +66,7 @@ export function ReceiptSheet({ saleId, onClose }: { saleId: string | null; onClo
 
   const renderCanvas = async () => {
     if (!receiptRef.current) return null;
+    const { default: html2canvas } = await import("html2canvas");
     return html2canvas(receiptRef.current, { backgroundColor: "#ffffff", scale: 2 });
   };
 
@@ -75,7 +74,7 @@ export function ReceiptSheet({ saleId, onClose }: { saleId: string | null; onClo
     try {
       const canvas = await renderCanvas();
       if (!canvas) return;
-      canvas.toBlob(async (blob) => {
+      canvas.toBlob(async (blob: Blob | null) => {
         if (!blob) return;
         await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
         toast.success("Recibo copiado como imagem");
@@ -88,13 +87,17 @@ export function ReceiptSheet({ saleId, onClose }: { saleId: string | null; onClo
   const downloadPdf = async () => {
     const canvas = await renderCanvas();
     if (!canvas) return;
-    const pdf = new jsPDF({
+    // Especificador montado em runtime: mantém o jspdf fora do bundle de servidor.
+    const mod = (await import(/* @vite-ignore */ ["js", "pdf"].join(""))) as typeof import("jspdf");
+    const pdf = new mod.jsPDF({
       unit: "px",
       format: [canvas.width, canvas.height],
     });
     pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, canvas.width, canvas.height);
     pdf.save(`recibo-pedido-${receiptSale?.sale_number ?? saleId}.pdf`);
   };
+
+
 
   return (
     <Sheet open={!!saleId} onOpenChange={(v) => !v && onClose()}>

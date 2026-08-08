@@ -79,6 +79,8 @@ export type Database = {
       customers: {
         Row: {
           address: string | null
+          birth_date: string | null
+          city: string | null
           created_at: string
           customer_type: Database["public"]["Enums"]["customer_type"]
           document: string | null
@@ -88,10 +90,14 @@ export type Database = {
           neighborhood: string | null
           notes: string | null
           phone: string | null
+          reference_point: string | null
           updated_at: string
+          zip_code: string | null
         }
         Insert: {
           address?: string | null
+          birth_date?: string | null
+          city?: string | null
           created_at?: string
           customer_type?: Database["public"]["Enums"]["customer_type"]
           document?: string | null
@@ -101,10 +107,14 @@ export type Database = {
           neighborhood?: string | null
           notes?: string | null
           phone?: string | null
+          reference_point?: string | null
           updated_at?: string
+          zip_code?: string | null
         }
         Update: {
           address?: string | null
+          birth_date?: string | null
+          city?: string | null
           created_at?: string
           customer_type?: Database["public"]["Enums"]["customer_type"]
           document?: string | null
@@ -114,7 +124,9 @@ export type Database = {
           neighborhood?: string | null
           notes?: string | null
           phone?: string | null
+          reference_point?: string | null
           updated_at?: string
+          zip_code?: string | null
         }
         Relationships: []
       }
@@ -133,6 +145,30 @@ export type Database = {
           amount?: number
           id?: string
           neighborhood?: string
+        }
+        Relationships: []
+      }
+      fixed_costs: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          monthly_amount: number
+          name: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          monthly_amount: number
+          name: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          monthly_amount?: number
+          name?: string
         }
         Relationships: []
       }
@@ -185,6 +221,35 @@ export type Database = {
             foreignKeyName: "offer_campaigns_offer_id_fkey"
             columns: ["offer_id"]
             isOneToOne: false
+            referencedRelation: "offers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      offer_costs: {
+        Row: {
+          kit_cost: number
+          offer_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          kit_cost: number
+          offer_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          kit_cost?: number
+          offer_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offer_costs_offer_id_fkey"
+            columns: ["offer_id"]
+            isOneToOne: true
             referencedRelation: "offers"
             referencedColumns: ["id"]
           },
@@ -622,7 +687,24 @@ export type Database = {
         Args: { _role: Database["public"]["Enums"]["app_role"] }
         Returns: boolean
       }
+      customer_stats: { Args: { p_customer: string }; Returns: Json }
       dispatch_route: { Args: { p_route: string }; Returns: number }
+      financial_by_offer: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          ad_cost: number
+          courier_cost: number
+          offer_id: string
+          offer_name: string
+          orders: number
+          product_cost: number
+          revenue: number
+        }[]
+      }
+      financial_summary: {
+        Args: { p_from: string; p_to: string }
+        Returns: Json
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -664,6 +746,42 @@ export type Database = {
           customers: number
           revenue: number
           sales_count: number
+        }[]
+      }
+      route_day_summary: {
+        Args: { p_date?: string }
+        Returns: {
+          cash_collected: number
+          closed_at: string
+          courier_id: string
+          delivered: number
+          dispatched_at: string
+          fee_payable: number
+          not_delivered: number
+          pending: number
+          route_id: string
+          stops: number
+        }[]
+      }
+      route_payment_breakdown: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          amount: number
+          courier_id: string
+          payment_method: string
+          transactions: number
+        }[]
+      }
+      route_range_summary: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          cash_collected: number
+          courier_id: string
+          delivered: number
+          fee_payable: number
+          not_delivered: number
+          pending: number
+          stops: number
         }[]
       }
       save_meta_settings: {
