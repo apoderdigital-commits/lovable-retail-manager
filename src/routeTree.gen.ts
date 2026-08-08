@@ -15,6 +15,7 @@ import { Route as ClientesRouteImport } from './routes/clientes'
 import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
 import { Route as EntregadorRouteImport } from './routes/entregador'
 import { Route as EntregasRouteImport } from './routes/entregas'
+import { Route as EntregasDashboardRouteImport } from './routes/entregas-dashboard'
 import { Route as MarketingRouteImport } from './routes/marketing'
 import { Route as FinanceiroRouteImport } from './routes/financeiro'
 import { Route as CustosRouteImport } from './routes/custos'
@@ -52,6 +53,11 @@ const EntregadorRoute = EntregadorRouteImport.update({
 const EntregasRoute = EntregasRouteImport.update({
   id: '/entregas',
   path: '/entregas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EntregasDashboardRoute = EntregasDashboardRouteImport.update({
+  id: '/entregas-dashboard',
+  path: '/entregas-dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MarketingRoute = MarketingRouteImport.update({
@@ -92,6 +98,7 @@ export interface FileRoutesByFullPath {
   '/configuracoes': typeof ConfiguracoesRoute
   '/entregador': typeof EntregadorRoute
   '/entregas': typeof EntregasRoute
+  '/entregas-dashboard': typeof EntregasDashboardRoute
   '/marketing': typeof MarketingRoute
   '/financeiro': typeof FinanceiroRoute
   '/custos': typeof CustosRoute
@@ -108,6 +115,7 @@ export interface FileRoutesByTo {
   '/configuracoes': typeof ConfiguracoesRoute
   '/entregador': typeof EntregadorRoute
   '/entregas': typeof EntregasRoute
+  '/entregas-dashboard': typeof EntregasDashboardRoute
   '/marketing': typeof MarketingRoute
   '/financeiro': typeof FinanceiroRoute
   '/custos': typeof CustosRoute
@@ -125,6 +133,7 @@ export interface FileRoutesById {
   '/configuracoes': typeof ConfiguracoesRoute
   '/entregador': typeof EntregadorRoute
   '/entregas': typeof EntregasRoute
+  '/entregas-dashboard': typeof EntregasDashboardRoute
   '/marketing': typeof MarketingRoute
   '/financeiro': typeof FinanceiroRoute
   '/custos': typeof CustosRoute
@@ -143,6 +152,7 @@ export interface FileRouteTypes {
     | '/configuracoes'
     | '/entregador'
     | '/entregas'
+    | '/entregas-dashboard'
     | '/marketing'
     | '/financeiro'
     | '/custos'
@@ -159,6 +169,7 @@ export interface FileRouteTypes {
     | '/configuracoes'
     | '/entregador'
     | '/entregas'
+    | '/entregas-dashboard'
     | '/marketing'
     | '/financeiro'
     | '/custos'
@@ -175,6 +186,7 @@ export interface FileRouteTypes {
     | '/configuracoes'
     | '/entregador'
     | '/entregas'
+    | '/entregas-dashboard'
     | '/marketing'
     | '/financeiro'
     | '/custos'
@@ -192,6 +204,7 @@ export interface RootRouteChildren {
   ConfiguracoesRoute: typeof ConfiguracoesRoute
   EntregadorRoute: typeof EntregadorRoute
   EntregasRoute: typeof EntregasRoute
+  EntregasDashboardRoute: typeof EntregasDashboardRoute
   MarketingRoute: typeof MarketingRoute
   FinanceiroRoute: typeof FinanceiroRoute
   CustosRoute: typeof CustosRoute
@@ -246,6 +259,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EntregasRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/entregas-dashboard': {
+      id: '/entregas-dashboard'
+      path: '/entregas-dashboard'
+      fullPath: '/entregas-dashboard'
+      preLoaderRoute: typeof EntregasDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/marketing': {
       id: '/marketing'
       path: '/marketing'
@@ -298,6 +318,7 @@ const rootRouteChildren: RootRouteChildren = {
   ConfiguracoesRoute: ConfiguracoesRoute,
   EntregadorRoute: EntregadorRoute,
   EntregasRoute: EntregasRoute,
+  EntregasDashboardRoute: EntregasDashboardRoute,
   MarketingRoute: MarketingRoute,
   FinanceiroRoute: FinanceiroRoute,
   CustosRoute: CustosRoute,

@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { AppShell, Metric } from "@/components/AppShell";
+import { AppShell } from "@/components/AppShell";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -60,23 +60,6 @@ type RouteSummary = {
   pending: number;
   fee_payable: number;
   cash_collected: number;
-};
-
-type RangeSummary = {
-  courier_id: string;
-  stops: number;
-  delivered: number;
-  not_delivered: number;
-  pending: number;
-  fee_payable: number;
-  cash_collected: number;
-};
-
-type PaymentBreakdown = {
-  courier_id: string;
-  payment_method: string;
-  transactions: number;
-  amount: number;
 };
 
 // data local no formato YYYY-MM-DD, sem escorregar de fuso
@@ -156,17 +139,6 @@ function DeliveriesPage() {
   });
 
   const summaryOf = (routeId: string) => summary.find((r) => r.route_id === routeId) ?? null;
-
-  const dia = summary.reduce(
-    (acc, r) => ({
-      corridas: acc.corridas + Number(r.delivered),
-      falhas: acc.falhas + Number(r.not_delivered),
-      naRua: acc.naRua + Number(r.pending),
-      taxa: acc.taxa + Number(r.fee_payable),
-      especie: acc.especie + Number(r.cash_collected),
-    }),
-    { corridas: 0, falhas: 0, naRua: 0, taxa: 0, especie: 0 },
-  );
 
   const feeOf = (neighborhood: string | null) =>
     Number(fees.find((f) => f.neighborhood === neighborhood)?.amount ?? 0);
@@ -277,31 +249,6 @@ function DeliveriesPage() {
         ) : null
       }
     >
-      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Metric
-          label="Corridas entregues"
-          value={String(dia.corridas)}
-          hint={dia.falhas > 0 ? `${dia.falhas} não entregue(s)` : "no dia de hoje"}
-        />
-        <Metric
-          label="Taxa a pagar"
-          value={brl(dia.taxa)}
-          tone="accent"
-          hint="só entregas concluídas"
-        />
-        <Metric
-          label="Dinheiro a acertar"
-          value={brl(dia.especie)}
-          hint="recebido em espécie"
-        />
-        <Metric
-          label="Ainda na rua"
-          value={String(dia.naRua)}
-          tone={dia.naRua > 0 ? "warning" : "default"}
-          hint="paradas pendentes"
-        />
-      </div>
-
       {couriers.length === 0 && (
         <div className="panel mb-4 p-4 text-sm text-muted-foreground">
           Nenhum entregador cadastrado. Crie o acesso em Usuários com o papel Entregador.
@@ -514,130 +461,7 @@ function DeliveriesPage() {
           })}
         </div>
       </div>
-
-      <PeriodSummary couriers={couriers} />
     </AppShell>
-  );
-}
-
-/**
- * Fila e saídas em andamento são sempre "hoje" — despachar um pedido de
- * outro dia não faz sentido. Já este resumo é histórico e filtrável, por
- * isso mora numa seção separada com o próprio controle de período.
- */
-function PeriodSummary({
-  couriers,
-}: {
-  couriers: { id: string; full_name: string | null; email: string }[];
-}) {
-  const [from, setFrom] = useState(todayISO);
-  const [to, setTo] = useState(todayISO);
-
-  const { data: range = [] } = useQuery({
-    queryKey: ["route-range-summary", from, to],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("route_range_summary", { p_from: from, p_to: to });
-      if (error) throw error;
-      return (data ?? []) as RangeSummary[];
-    },
-  });
-
-  const { data: payments = [] } = useQuery({
-    queryKey: ["route-payment-breakdown", from, to],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("route_payment_breakdown", {
-        p_from: from,
-        p_to: to,
-      });
-      if (error) throw error;
-      return (data ?? []) as PaymentBreakdown[];
-    },
-  });
-
-  const totals = range.reduce(
-    (acc, r) => ({
-      delivered: acc.delivered + Number(r.delivered),
-      notDelivered: acc.notDelivered + Number(r.not_delivered),
-      fee: acc.fee + Number(r.fee_payable),
-    }),
-    { delivered: 0, notDelivered: 0, fee: 0 },
-  );
-  const apurado = payments.reduce((s, p) => s + Number(p.amount), 0);
-
-  const nameOf = (id: string) => {
-    const c = couriers.find((x) => x.id === id);
-    return c?.full_name || c?.email || "—";
-  };
-
-  return (
-    <section className="panel mt-4">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
-        <h2 className="text-sm font-semibold">Resumo do período</h2>
-        <div className="flex items-end gap-2">
-          <div className="space-y-1">
-            <Label className="text-xs">De</Label>
-            <Input
-              type="date"
-              className="h-8"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Até</Label>
-            <Input type="date" className="h-8" value={to} onChange={(e) => setTo(e.target.value)} />
-          </div>
-        </div>
-      </header>
-
-      <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Metric label="Entregues" value={String(totals.delivered)} />
-        <Metric
-          label="Não entregues"
-          value={String(totals.notDelivered)}
-          tone={totals.notDelivered > 0 ? "warning" : "default"}
-        />
-        <Metric label="Taxa total" value={brl(totals.fee)} tone="accent" />
-        <Metric label="Total apurado" value={brl(apurado)} hint="todas as formas de pagamento" />
-      </div>
-
-      <div className="grid gap-3 border-t border-border p-4 sm:grid-cols-2 xl:grid-cols-3">
-        {range.map((r) => {
-          const meus = payments.filter((p) => p.courier_id === r.courier_id);
-          const meuApurado = meus.reduce((s, p) => s + Number(p.amount), 0);
-          return (
-            <div key={r.courier_id} className="rounded-lg border border-border p-3">
-              <p className="text-sm font-semibold">{nameOf(r.courier_id)}</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {r.delivered} entregue(s) · taxa {brl(Number(r.fee_payable))}
-              </p>
-              <div className="mt-2 space-y-1">
-                {meus.map((p) => (
-                  <div key={p.payment_method} className="flex justify-between text-xs">
-                    <span className="capitalize text-muted-foreground">
-                      {p.payment_method} · {p.transactions}x
-                    </span>
-                    <span className="font-medium">{brl(Number(p.amount))}</span>
-                  </div>
-                ))}
-                {meus.length === 0 && (
-                  <p className="text-xs text-muted-foreground">Sem entregas no período.</p>
-                )}
-              </div>
-              <div className="mt-2 flex justify-between border-t border-border pt-1.5 text-xs font-semibold">
-                <span>Apurado</span>
-                <span>{brl(meuApurado)}</span>
-              </div>
-            </div>
-          );
-        })}
-        {range.length === 0 && (
-          <p className="col-span-full py-6 text-center text-sm text-muted-foreground">
-            Nenhum motoboy com rota no período.
-          </p>
-        )}
-      </div>
-    </section>
   );
 }
 
