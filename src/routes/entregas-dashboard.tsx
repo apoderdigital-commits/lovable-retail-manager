@@ -1,10 +1,12 @@
 // dashboard de entregas: metricas gerais e por motoboy, com filtro de periodo
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { Wallet, Landmark, CreditCard, Receipt } from "lucide-react";
+import { useRef, useState } from "react";
+import { useReactToPrint } from "react-to-print";
+import { Wallet, Landmark, CreditCard, Receipt, Printer } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell, Metric } from "@/components/AppShell";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -14,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { CourierStatementPrint, type CourierStatementData } from "@/components/receipt/CourierStatement";
 import { brl } from "@/lib/format";
 
 export const Route = createFileRoute("/entregas-dashboard")({
@@ -109,6 +112,37 @@ function DeliveriesDashboardPage() {
     return c?.full_name || c?.email || "—";
   };
 
+  // extrato imprime todo mundo junto, independente do motoboy selecionado
+  // no filtro acima — é o resumo pra loja acertar com todos de uma vez
+  const statements: CourierStatementData[] = range.map((r) => {
+    const meus = payments.filter((p) => p.courier_id === r.courier_id);
+    return {
+      courierId: r.courier_id,
+      name: nameOf(r.courier_id),
+      delivered: Number(r.delivered),
+      notDelivered: Number(r.not_delivered),
+      fee: Number(r.fee_payable),
+      payments: meus.map((p) => ({
+        method: p.payment_method,
+        transactions: Number(p.transactions),
+        amount: Number(p.amount),
+      })),
+      apurado: meus.reduce((s, p) => s + Number(p.amount), 0),
+    };
+  });
+
+  const statementRef = useRef<HTMLDivElement>(null);
+  const printStatements = useReactToPrint({
+    contentRef: statementRef,
+    documentTitle: "Extratos motoboys",
+    pageStyle: `
+      @page { size: 80mm auto; margin: 0; }
+      @media print {
+        body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      }
+    `,
+  });
+
   // "todos" soma tudo; um motoboy específico filtra pro dele só. o resto
   // da tela usa o mesmo cálculo pros dois casos, sem branch separado.
   const visibleRange = courierId === "all" ? range : range.filter((r) => r.courier_id === courierId);
@@ -175,6 +209,14 @@ function DeliveriesDashboardPage() {
             <Label className="text-xs">Até</Label>
             <Input type="date" className="h-9" value={to} onChange={(e) => setTo(e.target.value)} />
           </div>
+          <Button
+            variant="outline"
+            className="h-9"
+            disabled={statements.length === 0}
+            onClick={() => printStatements()}
+          >
+            <Printer className="mr-2 size-4" /> Imprimir extratos
+          </Button>
         </div>
       }
     >
@@ -251,6 +293,10 @@ function DeliveriesDashboardPage() {
           </div>
         </section>
       )}
+
+      <div style={{ position: "fixed", left: "-9999px", top: 0 }}>
+        <CourierStatementPrint ref={statementRef} couriers={statements} from={from} to={to} />
+      </div>
     </AppShell>
   );
 }
