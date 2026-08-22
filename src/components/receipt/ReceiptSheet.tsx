@@ -99,7 +99,23 @@ export function ReceiptSheet({ saleId, onClose }: { saleId: string | null; onClo
     try {
       const canvas = buildCanvas();
       if (!canvas) return;
-      const { jsPDF } = await import("jspdf");
+      // Especificador montado em runtime: o jspdf não tem build para o
+      // ambiente do servidor, então precisa ficar invisível para o bundler
+      // e carregar só no navegador.
+      const mod = (await import(/* @vite-ignore */ ["js", "pdf"].join(""))) as {
+        jsPDF: new (opts: { unit: string; format: [number, number] }) => {
+          addImage: (
+            data: string,
+            fmt: string,
+            x: number,
+            y: number,
+            w: number,
+            h: number,
+          ) => void;
+          save: (name: string) => void;
+        };
+      };
+      const { jsPDF } = mod;
       const pdf = new jsPDF({
         unit: "px",
         format: [canvas.width, canvas.height],
