@@ -90,7 +90,10 @@ export function ReceiptSheet({ saleId, onClose }: { saleId: string | null; onClo
     try {
       const canvas = await renderCanvas();
       if (!canvas) return;
-      const { jsPDF } = await import("jspdf");
+      // Especificador calculado em runtime: mantém o jspdf fora da análise
+      // estática do bundler (é uma lib só de navegador).
+      const mod: any = await import(/* @vite-ignore */ ["js", "pdf"].join(""));
+      const jsPDF = mod.jsPDF ?? mod.default?.jsPDF ?? mod.default;
       const pdf = new jsPDF({
         unit: "px",
         format: [canvas.width, canvas.height],
