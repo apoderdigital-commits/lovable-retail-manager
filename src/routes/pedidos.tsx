@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Search, PackageCheck, RotateCcw, Ban, Eye, Printer } from "lucide-react";
+import { Search, PackageCheck, RotateCcw, Ban, Eye, Printer, ListFilter } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
@@ -26,6 +26,8 @@ import {
 } from "@/components/ui/table";
 import { brl } from "@/lib/format";
 import { ReceiptSheet } from "@/components/receipt/ReceiptSheet";
+import { PrintSettingsDialog } from "@/components/print-settings-dialog";
+import { MultiSelect } from "@/components/ui/multi-select";
 import type { Database } from "@/integrations/supabase/types";
 
 type Status = Database["public"]["Enums"]["order_status"];
@@ -53,16 +55,7 @@ const STATUS: Record<Status, { label: string; className: string }> = {
   cancelled: { label: "Cancelado", className: "bg-destructive text-destructive-foreground" },
 };
 
-const FILTERS: { value: Status | "all"; label: string }[] = [
-  { value: "all", label: "Todos" },
-  { value: "new", label: "Novos" },
-  { value: "picked", label: "Separados" },
-  { value: "on_route", label: "Em rota" },
-  { value: "scheduled", label: "Agendados" },
-  { value: "not_delivered", label: "Não entregues" },
-  { value: "delivered", label: "Entregues" },
-  { value: "cancelled", label: "Cancelados" },
-];
+const STATUS_OPTIONS = Object.entries(STATUS).map(([value, s]) => ({ value, label: s.label }));
 
 function StatusBadge({ status }: { status: Status }) {
   const s = STATUS[status];
@@ -71,7 +64,7 @@ function StatusBadge({ status }: { status: Status }) {
 
 function OrdersPage() {
   const qc = useQueryClient();
-  const [filter, setFilter] = useState<Status | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [term, setTerm] = useState("");
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [reason, setReason] = useState("");
@@ -79,15 +72,13 @@ function OrdersPage() {
   const [printingId, setPrintingId] = useState<string | null>(null);
 
   const { data: orders = [], isLoading } = useQuery({
-    queryKey: ["orders", filter],
+    queryKey: ["orders"],
     queryFn: async () => {
-      let q = supabase
+      const { data, error } = await supabase
         .from("sales")
         .select("*, customers(name, customer_type)")
         .order("created_at", { ascending: false })
         .limit(200);
-      if (filter !== "all") q = q.eq("status", filter);
-      const { data, error } = await q;
       if (error) throw error;
       return data;
     },
@@ -115,6 +106,7 @@ function OrdersPage() {
   });
 
   const filtered = orders.filter((o) => {
+    if (statusFilter.length > 0 && !statusFilter.includes(o.status)) return false;
     const name = o.customers?.name ?? "";
     return `${name} ${o.sale_number} ${o.neighborhood ?? ""}`
       .toLowerCase()
@@ -127,31 +119,26 @@ function OrdersPage() {
     <AppShell
       title="Pedidos"
       subtitle={isLoading ? "Carregando..." : `${filtered.length} pedido(s)`}
+      actions={<PrintSettingsDialog />}
     >
-      <div className="mb-4 flex flex-wrap gap-1.5">
-        {FILTERS.map((f) => (
-          <button
-            key={f.value}
-            onClick={() => setFilter(f.value)}
-            className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
-              filter === f.value
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground hover:bg-muted/70"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-
       <div className="panel overflow-hidden">
-        <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-          <Search className="size-4 text-muted-foreground" />
-          <input
-            className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-            placeholder="Buscar por cliente, número do pedido ou bairro"
-            value={term}
-            onChange={(e) => setTerm(e.target.value)}
+        <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
+          <div className="flex min-w-40 flex-1 items-center gap-2">
+            <Search className="size-4 shrink-0 text-muted-foreground" />
+            <input
+              className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+              placeholder="Buscar por cliente, número do pedido ou bairro"
+              value={term}
+              onChange={(e) => setTerm(e.target.value)}
+            />
+          </div>
+          <MultiSelect
+            options={STATUS_OPTIONS}
+            selected={statusFilter}
+            onChange={setStatusFilter}
+            placeholder="Status"
+            allLabel="Todos os status"
+            icon={<ListFilter className="size-3.5" />}
           />
         </div>
         <Table>

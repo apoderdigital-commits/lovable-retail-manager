@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Plus, Pencil, Trash2, Search } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Tags } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +10,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -50,7 +57,7 @@ type ProductForm = {
   id?: string;
   name: string;
   sku: string;
-  category: string;
+  category_id: string;
   cost_price: string;
   price: string;
   wholesale_price: string;
@@ -61,7 +68,7 @@ type ProductForm = {
 const empty: ProductForm = {
   name: "",
   sku: "",
-  category: "",
+  category_id: "none",
   cost_price: "",
   price: "",
   wholesale_price: "",
@@ -72,7 +79,6 @@ const empty: ProductForm = {
 const schema = z.object({
   name: z.string().trim().min(2, { message: "Informe o nome do produto" }).max(120),
   sku: z.string().trim().max(60),
-  category: z.string().trim().max(60),
   price: z.number().nonnegative(),
   wholesale_price: z.number().nonnegative(),
   cost_price: z.number().nonnegative(),
@@ -96,12 +102,23 @@ function ProductsPage() {
     },
   });
 
+  const { data: categories = [] } = useQuery({
+    queryKey: ["product-categories"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("product_categories").select("*").order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const categoryNameOf = (id: string | null) =>
+    categories.find((c) => c.id === id)?.name ?? "";
+
   const save = useMutation({
     mutationFn: async (input: ProductForm) => {
       const parsed = schema.safeParse({
         name: input.name,
         sku: input.sku,
-        category: input.category,
         price: Number(input.price || 0),
         wholesale_price: Number(input.wholesale_price || input.price || 0),
         cost_price: Number(input.cost_price || 0),
@@ -112,7 +129,7 @@ function ProductsPage() {
       const payload = {
         ...parsed.data,
         sku: parsed.data.sku || null,
-        category: parsed.data.category || null,
+        category_id: input.category_id === "none" ? null : input.category_id,
       };
       if (input.id) {
         const { error } = await supabase.from("products").update(payload).eq("id", input.id);
@@ -145,7 +162,9 @@ function ProductsPage() {
   });
 
   const filtered = products.filter((p) =>
-    `${p.name} ${p.sku ?? ""} ${p.category ?? ""}`.toLowerCase().includes(term.toLowerCase()),
+    `${p.name} ${p.sku ?? ""} ${categoryNameOf(p.category_id)}`
+      .toLowerCase()
+      .includes(term.toLowerCase()),
   );
 
   const openEdit = (p: (typeof products)[number]) => {
@@ -153,7 +172,7 @@ function ProductsPage() {
       id: p.id,
       name: p.name,
       sku: p.sku ?? "",
-      category: p.category ?? "",
+      category_id: p.category_id ?? "none",
       cost_price: String(p.cost_price),
       price: String(p.price),
       wholesale_price: String(p.wholesale_price),
@@ -168,6 +187,8 @@ function ProductsPage() {
       title="Produtos e estoque"
       subtitle={`${products.length} item(ns) cadastrado(s)`}
       actions={
+        <div className="flex items-center gap-2">
+          {isAdmin && <CategoriesManager categories={categories} />}
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button onClick={() => setForm(empty)}>
@@ -195,10 +216,22 @@ function ProductsPage() {
               </div>
               <div className="space-y-1.5">
                 <Label>Categoria</Label>
-                <Input
-                  value={form.category}
-                  onChange={(e) => setForm({ ...form, category: e.target.value })}
-                />
+                <Select
+                  value={form.category_id}
+                  onValueChange={(v) => setForm({ ...form, category_id: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sem categoria</SelectItem>
+                    {categories.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-1.5">
                 <Label>Preço de custo</Label>
@@ -257,6 +290,7 @@ function ProductsPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
       }
     >
       <div className="panel overflow-hidden">
@@ -290,7 +324,9 @@ function ProductsPage() {
                   <p className="font-medium">{p.name}</p>
                   {p.sku && <p className="text-xs text-muted-foreground">{p.sku}</p>}
                 </TableCell>
-                <TableCell className="text-muted-foreground">{p.category ?? "—"}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {categoryNameOf(p.category_id) || "—"}
+                </TableCell>
                 <TableCell className="text-right">{brl(Number(p.cost_price))}</TableCell>
                 <TableCell className="text-right font-medium">{brl(Number(p.price))}</TableCell>
                 <TableCell className="text-right">{brl(Number(p.wholesale_price))}</TableCell>
@@ -327,5 +363,143 @@ function ProductsPage() {
         </Table>
       </div>
     </AppShell>
+  );
+}
+
+type Category = { id: string; name: string };
+
+/**
+ * Gestão de categorias — fica atrás de um botão porque categoria muda pouco
+ * e a tela de produtos é usada o dia inteiro. Sem admin não abre: a RLS já
+ * bloqueia a escrita, então nem vale mostrar o botão pra quem não pode usar.
+ */
+function CategoriesManager({ categories }: { categories: Category[] }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [editing, setEditing] = useState<Category | null>(null);
+
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["product-categories"] });
+    qc.invalidateQueries({ queryKey: ["products"] });
+  };
+
+  const add = useMutation({
+    mutationFn: async (value: string) => {
+      const trimmed = value.trim();
+      if (!trimmed) throw new Error("Informe o nome da categoria");
+      const { error } = await supabase.from("product_categories").insert({ name: trimmed });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setName("");
+      refresh();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const rename = useMutation({
+    mutationFn: async ({ id, value }: { id: string; value: string }) => {
+      const trimmed = value.trim();
+      if (!trimmed) throw new Error("Informe o nome da categoria");
+      const { error } = await supabase
+        .from("product_categories")
+        .update({ name: trimmed })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setEditing(null);
+      refresh();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("product_categories").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Categoria excluída");
+      refresh();
+    },
+    onError: () => toast.error("Não foi possível excluir a categoria"),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline">
+          <Tags className="mr-2 size-4" /> Categorias
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Categorias</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-2">
+          {categories.map((c) =>
+            editing?.id === c.id ? (
+              <div key={c.id} className="flex items-center gap-2">
+                <Input
+                  autoFocus
+                  maxLength={20}
+                  value={editing.name}
+                  onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+                  onKeyDown={(e) => e.key === "Enter" && rename.mutate({ id: c.id, value: editing.name })}
+                />
+                <Button
+                  size="sm"
+                  disabled={rename.isPending}
+                  onClick={() => rename.mutate({ id: c.id, value: editing.name })}
+                >
+                  Salvar
+                </Button>
+              </div>
+            ) : (
+              <div key={c.id} className="flex items-center justify-between rounded-md px-2 py-1.5 hover:bg-muted">
+                <span className="text-sm">{c.name}</span>
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="icon" className="size-7" onClick={() => setEditing(c)}>
+                    <Pencil className="size-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7"
+                    onClick={() => remove.mutate(c.id)}
+                  >
+                    <Trash2 className="size-3.5 text-destructive" />
+                  </Button>
+                </div>
+              </div>
+            ),
+          )}
+          {categories.length === 0 && (
+            <p className="py-4 text-center text-sm text-muted-foreground">
+              Nenhuma categoria cadastrada ainda.
+            </p>
+          )}
+        </div>
+
+        <div className="border-t border-border pt-3">
+          <Label className="text-xs">Nova categoria</Label>
+          <div className="mt-1.5 flex items-center gap-2">
+            <Input
+              maxLength={20}
+              placeholder="Máx. 20 caracteres"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && add.mutate(name)}
+            />
+            <Button size="icon" disabled={add.isPending} onClick={() => add.mutate(name)}>
+              <Plus className="size-4" />
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

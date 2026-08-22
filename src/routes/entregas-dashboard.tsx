@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CourierStatementPrint, type CourierStatementData } from "@/components/receipt/CourierStatement";
+import { usePrintSettings, printPageStyle } from "@/hooks/use-print-settings";
 import { brl } from "@/lib/format";
 
 export const Route = createFileRoute("/entregas-dashboard")({
@@ -131,16 +132,13 @@ function DeliveriesDashboardPage() {
     };
   });
 
+  const { settings: printSettings } = usePrintSettings();
+  const statementPaperWidth = printSettings.printerType === "thermal" ? printSettings.paperWidth : "auto";
   const statementRef = useRef<HTMLDivElement>(null);
   const printStatements = useReactToPrint({
     contentRef: statementRef,
     documentTitle: "Extratos motoboys",
-    pageStyle: `
-      @page { size: 80mm auto; margin: 0; }
-      @media print {
-        body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      }
-    `,
+    pageStyle: printPageStyle(printSettings),
   });
 
   // "todos" soma tudo; um motoboy específico filtra pro dele só. o resto
@@ -295,7 +293,13 @@ function DeliveriesDashboardPage() {
       )}
 
       <div style={{ position: "fixed", left: "-9999px", top: 0 }}>
-        <CourierStatementPrint ref={statementRef} couriers={statements} from={from} to={to} />
+        <CourierStatementPrint
+          ref={statementRef}
+          couriers={statements}
+          from={from}
+          to={to}
+          paperWidth={statementPaperWidth}
+        />
       </div>
     </AppShell>
   );

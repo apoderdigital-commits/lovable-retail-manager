@@ -4,12 +4,15 @@ import { useReactToPrint } from "react-to-print";
 import { Download, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { usePrintSettings, printPageStyle } from "@/hooks/use-print-settings";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Receipt, type ReceiptItem, type ReceiptSale } from "@/components/receipt/Receipt";
 
 export function ReceiptSheet({ saleId, onClose }: { saleId: string | null; onClose: () => void }) {
   const receiptRef = useRef<HTMLDivElement>(null);
+  const { settings } = usePrintSettings();
+  const paperWidth = settings.printerType === "thermal" ? settings.paperWidth : "auto";
 
   const { data: sale } = useQuery({
     queryKey: ["receipt-sale", saleId],
@@ -58,19 +61,10 @@ export function ReceiptSheet({ saleId, onClose }: { saleId: string | null; onClo
     total: Number(i.total),
   }));
 
-  // 80mm é a largura padrão de bobina térmica. O @page manda o navegador
-  // usar esse tamanho de papel; o print-color-adjust garante que fundo e
-  // linhas do recibo saiam na impressora mesmo com "gráficos de fundo"
-  // desligado no driver.
   const print = useReactToPrint({
     contentRef: receiptRef,
     documentTitle: receiptSale ? `Pedido ${receiptSale.sale_number}` : "Recibo",
-    pageStyle: `
-      @page { size: 80mm auto; margin: 0; }
-      @media print {
-        body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      }
-    `,
+    pageStyle: printPageStyle(settings),
   });
 
   const renderCanvas = async () => {
@@ -117,7 +111,7 @@ export function ReceiptSheet({ saleId, onClose }: { saleId: string | null; onClo
 
         <div className="flex-1 overflow-y-auto rounded-md border border-border py-4">
           {receiptSale ? (
-            <Receipt ref={receiptRef} sale={receiptSale} items={receiptItems} />
+            <Receipt ref={receiptRef} sale={receiptSale} items={receiptItems} paperWidth={paperWidth} />
           ) : (
             <p className="py-10 text-center text-sm text-muted-foreground">Carregando recibo...</p>
           )}

@@ -1,7 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { Minus, Plus, Search, Trash2, CheckCircle2, Truck, Sparkles, Repeat } from "lucide-react";
+import {
+  Minus,
+  Plus,
+  Search,
+  Trash2,
+  CheckCircle2,
+  Truck,
+  Sparkles,
+  Repeat,
+  LayoutGrid,
+  List,
+  Tags,
+} from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
@@ -17,6 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { brl } from "@/lib/format";
+import { MultiSelect } from "@/components/ui/multi-select";
 import { CustomerPicker } from "@/components/customer-picker";
 import { ReceiptSheet } from "@/components/receipt/ReceiptSheet";
 
@@ -51,6 +64,8 @@ function PdvPage() {
   const qc = useQueryClient();
   const [mode, setMode] = useState<Mode>("counter");
   const [term, setTerm] = useState("");
+  const [view, setView] = useState<"grid" | "list">("grid");
+  const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
   // guarda só id e quantidade: o preço é derivado do tipo do cliente,
   // então trocar o cliente reprecifica o carrinho inteiro sozinho
   const [cart, setCart] = useState<{ productId: string; quantity: number }[]>([]);
@@ -84,6 +99,15 @@ function PdvPage() {
         .from("customers")
         .select("id, name, phone, document, customer_type, address, neighborhood")
         .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ["product-categories"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("product_categories").select("*").order("name");
       if (error) throw error;
       return data;
     },
@@ -132,11 +156,12 @@ function PdvPage() {
   const filtered = useMemo(
     () =>
       products
-        .filter((p) =>
-          `${p.name} ${p.sku ?? ""} ${p.category ?? ""}`.toLowerCase().includes(term.toLowerCase()),
+        .filter((p) => `${p.name} ${p.sku ?? ""}`.toLowerCase().includes(term.toLowerCase()))
+        .filter(
+          (p) => categoryFilter.length === 0 || categoryFilter.includes(p.category_id ?? ""),
         )
         .slice(0, 12),
-    [products, term],
+    [products, term, categoryFilter],
   );
 
   const lines = cart.flatMap((i) => {
@@ -259,39 +284,99 @@ function PdvPage() {
     >
       <div className="grid gap-5 lg:grid-cols-5">
         <section className="panel lg:col-span-3">
-          <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-            <Search className="size-4 text-muted-foreground" />
-            <input
-              className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-              placeholder="Buscar produto por nome ou código"
-              value={term}
-              onChange={(e) => setTerm(e.target.value)}
+          <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
+            <div className="flex min-w-40 flex-1 items-center gap-2">
+              <Search className="size-4 shrink-0 text-muted-foreground" />
+              <input
+                className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                placeholder="Buscar produto por nome ou código"
+                value={term}
+                onChange={(e) => setTerm(e.target.value)}
+              />
+            </div>
+            <MultiSelect
+              options={categories.map((c) => ({ value: c.id, label: c.name }))}
+              selected={categoryFilter}
+              onChange={setCategoryFilter}
+              placeholder="Categoria"
+              allLabel="Todas as categorias"
+              icon={<Tags className="size-3.5" />}
             />
-          </div>
-          <div className="grid gap-2 p-4 sm:grid-cols-2">
-            {filtered.map((p) => (
+            <div className="flex shrink-0 gap-0.5 rounded-md border border-border p-0.5">
               <button
-                key={p.id}
-                onClick={() => add(p)}
-                disabled={(p.available_stock ?? 0) <= 0}
-                className="flex flex-col items-start rounded-lg border border-border bg-background p-3 text-left transition-colors hover:border-accent disabled:opacity-50"
+                onClick={() => setView("grid")}
+                className={`rounded px-2 py-1 transition-colors ${
+                  view === "grid" ? "bg-secondary" : "text-muted-foreground hover:bg-muted"
+                }`}
               >
-                <span className="text-sm font-medium">{p.name}</span>
-                <span className="mt-1 font-display text-base font-semibold">
-                  {brl(priceOf(p))}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {p.available_stock ?? 0} disponível(is)
-                  {p.reserved_stock > 0 && ` · ${p.reserved_stock} reservado(s)`}
-                </span>
+                <LayoutGrid className="size-3.5" />
               </button>
-            ))}
-            {filtered.length === 0 && (
-              <p className="col-span-full py-8 text-center text-sm text-muted-foreground">
-                Nenhum produto encontrado.
-              </p>
-            )}
+              <button
+                onClick={() => setView("list")}
+                className={`rounded px-2 py-1 transition-colors ${
+                  view === "list" ? "bg-secondary" : "text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                <List className="size-3.5" />
+              </button>
+            </div>
           </div>
+
+          {view === "grid" ? (
+            <div className="grid gap-2 p-4 sm:grid-cols-2">
+              {filtered.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => add(p)}
+                  disabled={(p.available_stock ?? 0) <= 0}
+                  className="flex flex-col items-start rounded-lg border border-border bg-background p-3 text-left transition-colors hover:border-accent disabled:opacity-50"
+                >
+                  <span className="text-sm font-medium">{p.name}</span>
+                  <span className="mt-1 font-display text-base font-semibold">
+                    {brl(priceOf(p))}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {p.available_stock ?? 0} disponível(is)
+                    {p.reserved_stock > 0 && ` · ${p.reserved_stock} reservado(s)`}
+                  </span>
+                </button>
+              ))}
+              {filtered.length === 0 && (
+                <p className="col-span-full py-8 text-center text-sm text-muted-foreground">
+                  Nenhum produto encontrado.
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="divide-y divide-border">
+              {filtered.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => add(p)}
+                  disabled={(p.available_stock ?? 0) <= 0}
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-muted disabled:opacity-50"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{p.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {categories.find((c) => c.id === p.category_id)?.name ?? "Sem categoria"}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    {p.available_stock ?? 0} disp.
+                  </span>
+                  <span className="shrink-0 font-display text-sm font-semibold">
+                    {brl(priceOf(p))}
+                  </span>
+                </button>
+              ))}
+              {filtered.length === 0 && (
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  Nenhum produto encontrado.
+                </p>
+              )}
+            </div>
+          )}
         </section>
 
         <section className="panel flex flex-col lg:col-span-2">

@@ -21,18 +21,26 @@ export type ReceiptItem = {
   total: number;
 };
 
+// 1mm ~= 3.78px a 96dpi. "auto" (impressora comum) fica com uma largura de
+// leitura confortável, sem forçar bobina estreita.
+const widthPx = (widthMm: "58mm" | "80mm" | "auto") =>
+  widthMm === "auto" ? 380 : Math.round(parseInt(widthMm, 10) * 3.78);
+
 /**
  * Recibo puro, sem depender do tema (claro/escuro) do app: html2canvas e
  * impressão térmica precisam de preto sobre branco de verdade, não de
  * variáveis CSS que mudam com o sistema de quem está olhando a tela.
  */
-export const Receipt = forwardRef<HTMLDivElement, { sale: ReceiptSale; items: ReceiptItem[] }>(
-  ({ sale, items }, ref) => {
-    return (
-      <div
-        ref={ref}
-        className="mx-auto w-[300px] bg-white p-4 font-mono text-[12px] leading-tight text-black"
-      >
+export const Receipt = forwardRef<
+  HTMLDivElement,
+  { sale: ReceiptSale; items: ReceiptItem[]; paperWidth?: "58mm" | "80mm" | "auto" }
+>(({ sale, items, paperWidth = "80mm" }, ref) => {
+  return (
+    <div
+      ref={ref}
+      style={{ width: widthPx(paperWidth) }}
+      className="mx-auto bg-white p-4 font-mono text-[12px] leading-tight text-black"
+    >
         <div className="text-center">
           <p className="text-sm font-bold">VIEIRA PERFUMES</p>
           <p className="mt-0.5">Recibo de venda</p>

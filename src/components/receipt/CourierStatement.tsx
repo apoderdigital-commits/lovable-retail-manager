@@ -13,6 +13,11 @@ export type CourierStatementData = {
 
 const dateBr = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString("pt-BR");
 
+// 1mm ~= 3.78px a 96dpi. "auto" (impressora comum) fica com uma largura de
+// leitura confortável, sem forçar bobina estreita.
+const widthPx = (paperWidth: "58mm" | "80mm" | "auto") =>
+  paperWidth === "auto" ? 380 : Math.round(parseInt(paperWidth, 10) * 3.78);
+
 /**
  * Um cartão de extrato por motoboy, impresso em sequência (impressora
  * térmica corta/alimenta entre um e outro). Mesmo conteúdo do card "Por
@@ -20,8 +25,8 @@ const dateBr = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString("
  */
 export const CourierStatementPrint = forwardRef<
   HTMLDivElement,
-  { couriers: CourierStatementData[]; from: string; to: string }
->(({ couriers, from, to }, ref) => {
+  { couriers: CourierStatementData[]; from: string; to: string; paperWidth?: "58mm" | "80mm" | "auto" }
+>(({ couriers, from, to, paperWidth = "80mm" }, ref) => {
   const period = from === to ? dateBr(from) : `${dateBr(from)} a ${dateBr(to)}`;
 
   return (
@@ -29,8 +34,11 @@ export const CourierStatementPrint = forwardRef<
       {couriers.map((c, idx) => (
         <div
           key={c.courierId}
-          className="mx-auto w-[300px] bg-white p-4 font-mono text-[12px] leading-tight text-black"
-          style={{ pageBreakAfter: idx < couriers.length - 1 ? "always" : "auto" }}
+          style={{
+            width: widthPx(paperWidth),
+            pageBreakAfter: idx < couriers.length - 1 ? "always" : "auto",
+          }}
+          className="mx-auto bg-white p-4 font-mono text-[12px] leading-tight text-black"
         >
           <div className="text-center">
             <p className="text-sm font-bold">VIEIRA PERFUMES</p>
