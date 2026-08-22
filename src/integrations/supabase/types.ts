@@ -76,6 +76,30 @@ export type Database = {
           },
         ]
       }
+      courier_locations: {
+        Row: {
+          accuracy: number | null
+          courier_id: string
+          lat: number
+          lng: number
+          updated_at: string
+        }
+        Insert: {
+          accuracy?: number | null
+          courier_id: string
+          lat: number
+          lng: number
+          updated_at?: string
+        }
+        Update: {
+          accuracy?: number | null
+          courier_id?: string
+          lat?: number
+          lng?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           address: string | null
@@ -282,11 +306,29 @@ export type Database = {
         }
         Relationships: []
       }
+      product_categories: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           active: boolean
           available_stock: number | null
-          category: string | null
+          category_id: string | null
           cost_price: number
           created_at: string
           id: string
@@ -302,7 +344,7 @@ export type Database = {
         Insert: {
           active?: boolean
           available_stock?: number | null
-          category?: string | null
+          category_id?: string | null
           cost_price?: number
           created_at?: string
           id?: string
@@ -318,7 +360,7 @@ export type Database = {
         Update: {
           active?: boolean
           available_stock?: number | null
-          category?: string | null
+          category_id?: string | null
           cost_price?: number
           created_at?: string
           id?: string
@@ -331,7 +373,15 @@ export type Database = {
           updated_at?: string
           wholesale_price?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "products_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "product_categories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -740,6 +790,16 @@ export type Database = {
         }[]
       }
       open_route_for: { Args: { p_courier: string }; Returns: string }
+      organic_offer_match: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          customers: number
+          offer_id: string
+          offer_name: string
+          revenue: number
+          sales_count: number
+        }[]
+      }
       organic_performance: {
         Args: { p_from: string; p_to: string }
         Returns: {

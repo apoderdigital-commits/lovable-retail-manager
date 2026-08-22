@@ -80,8 +80,8 @@ function TrackingPage() {
     const loc = locations.find((l) => l.courier_id === c.id);
     return {
       id: c.id,
-      name: c.full_name || c.email,
-      color: PALETTE[idx % PALETTE.length],
+      name: c.full_name || c.email || "Entregador",
+      color: PALETTE[idx % PALETTE.length] ?? "#2563eb",
       lat: loc?.lat ?? null,
       lng: loc?.lng ?? null,
       updatedAt: loc?.updated_at ?? null,

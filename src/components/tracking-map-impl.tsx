@@ -31,8 +31,9 @@ function FitBounds({ couriers }: { couriers: TrackedCourier[] }) {
       (c): c is TrackedCourier & { lat: number; lng: number } => c.lat !== null && c.lng !== null,
     );
     if (pts.length === 0) return;
-    if (pts.length === 1) {
-      map.setView([pts[0].lat, pts[0].lng], 15);
+    const first = pts[0];
+    if (pts.length === 1 && first) {
+      map.setView([first.lat, first.lng], 15);
       return;
     }
     map.fitBounds(
@@ -68,7 +69,7 @@ export function TrackingMap({
           </Popup>
         </Marker>
       ))}
-      <FocusOn id={focusId} couriers={withPosition} />
+      <FocusOn id={focusId ?? null} couriers={withPosition} />
     </MapContainer>
   );
 }
