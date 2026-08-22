@@ -8,6 +8,12 @@ import { usePrintSettings, printPageStyle } from "@/hooks/use-print-settings";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Receipt, type ReceiptItem, type ReceiptSale } from "@/components/receipt/Receipt";
+import { renderReceiptCanvas } from "@/components/receipt/receipt-canvas";
+
+// 1mm ~= 3.78px a 96dpi. "auto" (impressora comum) fica com uma largura de
+// leitura confortável, sem forçar bobina estreita.
+const widthPx = (paperWidth: "58mm" | "80mm" | "auto") =>
+  paperWidth === "auto" ? 380 : Math.round(parseInt(paperWidth, 10) * 3.78);
 
 export function ReceiptSheet({ saleId, onClose }: { saleId: string | null; onClose: () => void }) {
   const receiptRef = useRef<HTMLDivElement>(null);
@@ -67,19 +73,17 @@ export function ReceiptSheet({ saleId, onClose }: { saleId: string | null; onClo
     pageStyle: printPageStyle(settings),
   });
 
-  // html2canvas-pro (não o html2canvas original) porque o tema do app usa
-  // oklch() nas cores (Tailwind v4) e a lib original não sabe interpretar
-  // essa função de cor — quebra a captura de qualquer elemento que herde
-  // essas variáveis, mesmo indiretamente.
-  const renderCanvas = async () => {
-    if (!receiptRef.current) return null;
-    const { default: html2canvas } = await import("html2canvas-pro");
-    return html2canvas(receiptRef.current, { backgroundColor: "#ffffff", scale: 2 });
+  // Desenhado na mão no canvas (sem html2canvas): a hospedagem bloqueia
+  // eval/new Function por política de segurança, e é exatamente isso que
+  // qualquer lib de "fotografar o DOM" usa por baixo dos panos.
+  const buildCanvas = () => {
+    if (!receiptSale) return null;
+    return renderReceiptCanvas(receiptSale, receiptItems, widthPx(paperWidth));
   };
 
-  const downloadImage = async () => {
+  const downloadImage = () => {
     try {
-      const canvas = await renderCanvas();
+      const canvas = buildCanvas();
       if (!canvas) return;
       const link = document.createElement("a");
       link.href = canvas.toDataURL("image/png");
@@ -93,11 +97,8 @@ export function ReceiptSheet({ saleId, onClose }: { saleId: string | null; onClo
 
   const downloadPdf = async () => {
     try {
-      const canvas = await renderCanvas();
+      const canvas = buildCanvas();
       if (!canvas) return;
-      // Import estático (com string literal) — o bundler consegue separar
-      // isso num chunk à parte carregado só quando clicado, sem precisar de
-      // truque de string em runtime (que o navegador não resolve sozinho).
       const { jsPDF } = await import("jspdf");
       const pdf = new jsPDF({
         unit: "px",
