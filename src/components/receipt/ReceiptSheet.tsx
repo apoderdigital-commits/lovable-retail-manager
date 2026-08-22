@@ -67,9 +67,13 @@ export function ReceiptSheet({ saleId, onClose }: { saleId: string | null; onClo
     pageStyle: printPageStyle(settings),
   });
 
+  // html2canvas-pro (não o html2canvas original) porque o tema do app usa
+  // oklch() nas cores (Tailwind v4) e a lib original não sabe interpretar
+  // essa função de cor — quebra a captura de qualquer elemento que herde
+  // essas variáveis, mesmo indiretamente.
   const renderCanvas = async () => {
     if (!receiptRef.current) return null;
-    const { default: html2canvas } = await import("html2canvas");
+    const { default: html2canvas } = await import("html2canvas-pro");
     return html2canvas(receiptRef.current, { backgroundColor: "#ffffff", scale: 2 });
   };
 
@@ -81,7 +85,8 @@ export function ReceiptSheet({ saleId, onClose }: { saleId: string | null; onClo
       link.href = canvas.toDataURL("image/png");
       link.download = `recibo-pedido-${receiptSale?.sale_number ?? saleId}.png`;
       link.click();
-    } catch {
+    } catch (e) {
+      console.error("downloadImage", e);
       toast.error("Não foi possível gerar a imagem");
     }
   };
@@ -90,17 +95,18 @@ export function ReceiptSheet({ saleId, onClose }: { saleId: string | null; onClo
     try {
       const canvas = await renderCanvas();
       if (!canvas) return;
-      // Especificador calculado em runtime: mantém o jspdf fora da análise
-      // estática do bundler (é uma lib só de navegador).
-      const mod: any = await import(/* @vite-ignore */ ["js", "pdf"].join(""));
-      const jsPDF = mod.jsPDF ?? mod.default?.jsPDF ?? mod.default;
+      // Import estático (com string literal) — o bundler consegue separar
+      // isso num chunk à parte carregado só quando clicado, sem precisar de
+      // truque de string em runtime (que o navegador não resolve sozinho).
+      const { jsPDF } = await import("jspdf");
       const pdf = new jsPDF({
         unit: "px",
         format: [canvas.width, canvas.height],
       });
       pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, canvas.width, canvas.height);
       pdf.save(`recibo-pedido-${receiptSale?.sale_number ?? saleId}.pdf`);
-    } catch {
+    } catch (e) {
+      console.error("downloadPdf", e);
       toast.error("Não foi possível gerar o PDF");
     }
   };
