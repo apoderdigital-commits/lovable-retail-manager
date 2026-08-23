@@ -1,15 +1,13 @@
--- ═══════════════════════════════════════════════════════════════════════
 -- CRM de recompra: dias de recompra por oferta, credenciais da Evolution
--- API (guardadas, não usadas ainda) e o log de follow-ups. Por enquanto
--- "enviar follow up" só registra que foi enviado — o disparo de verdade
--- pela Evolution API é uma etapa futura (precisa de Edge Function).
--- ═══════════════════════════════════════════════════════════════════════
+-- API (guardadas, ainda nao usadas pra enviar) e o log de follow-ups. Por
+-- enquanto "enviar follow up" so registra que foi enviado -- o disparo de
+-- verdade pela Evolution API fica pra uma proxima etapa.
 
--- ─── 1. Dias pra recompra, por oferta ──────────────────────────────────
+-- 1. Dias pra recompra, por oferta
 alter table offers add column if not exists repurchase_days integer;
 
--- ─── 2. Credenciais da Evolution API — mesmo padrão do integration_settings:
--- sem política de SELECT, só sai (redigido) pela função de status abaixo.
+-- 2. Credenciais da Evolution API -- mesmo padrao do integration_settings:
+-- sem politica de SELECT, so sai (redigido) pela funcao de status abaixo.
 create table if not exists crm_settings (
   id                  text primary key,
   evolution_api_url   text,
@@ -37,7 +35,7 @@ create or replace function save_crm_settings(
 language plpgsql security definer set search_path = public as $$
 begin
   if not current_has_role('admin') then
-    raise exception 'Apenas administradores alteram integrações';
+    raise exception 'Apenas administradores alteram integracoes';
   end if;
 
   insert into crm_settings (
@@ -55,7 +53,6 @@ begin
   on conflict (id) do update set
     evolution_api_url  = coalesce(excluded.evolution_api_url, crm_settings.evolution_api_url),
     evolution_instance = coalesce(excluded.evolution_instance, crm_settings.evolution_instance),
-    -- api key em branco mantém a atual: dá pra corrigir só a instância/mensagem
     evolution_api_key  = coalesce(excluded.evolution_api_key, crm_settings.evolution_api_key),
     followup_message   = coalesce(excluded.followup_message, crm_settings.followup_message),
     updated_at         = now(),
@@ -67,8 +64,8 @@ end $$;
 revoke all on function save_crm_settings(text, text, text, text) from public, anon;
 grant execute on function save_crm_settings(text, text, text, text) to authenticated;
 
--- a tela precisa saber se está configurado, ver a instância/mensagem (não
--- são segredo) e os 4 últimos dígitos da key — nunca a key inteira
+-- a tela precisa saber se esta configurado, ver a instancia/mensagem (nao
+-- sao segredo) e os 4 ultimos digitos da key -- nunca a key inteira
 create or replace function crm_settings_status()
 returns jsonb language sql stable security definer set search_path = public as $$
   select case
@@ -89,9 +86,9 @@ $$;
 revoke all on function crm_settings_status() from public, anon;
 grant execute on function crm_settings_status() to authenticated;
 
--- crm_settings_status() é só pra Configurações (admin). O quadro do CRM é
--- usado pela equipe toda pra mandar follow-up, então precisa de um jeito de
--- ler só a mensagem (não é segredo) sem expor URL/instância/chave.
+-- crm_settings_status() e so pra Configuracoes (admin). O quadro do CRM e
+-- usado pela equipe toda pra mandar follow-up, entao precisa de um jeito de
+-- ler so a mensagem (nao e segredo) sem expor URL/instancia/chave.
 create or replace function crm_followup_message()
 returns text language plpgsql stable security definer set search_path = public as $$
 declare
@@ -107,8 +104,8 @@ end $$;
 revoke all on function crm_followup_message() from public, anon;
 grant execute on function crm_followup_message() to authenticated;
 
--- ─── 3. Log de follow-ups. Não é dado sensível (é só "avisei o cliente
--- em tal dia"), então segue o padrão normal de staff, sem função. ───────
+-- 3. Log de follow-ups. Nao e dado sensivel (e so "avisei o cliente em tal
+-- dia"), entao segue o padrao normal de staff, sem funcao.
 create table if not exists crm_followups (
   id          bigint generated always as identity primary key,
   customer_id uuid not null references customers(id) on delete cascade,
