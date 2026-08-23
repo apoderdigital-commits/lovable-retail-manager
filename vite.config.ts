@@ -12,4 +12,14 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  vite: {
+    ssr: {
+      // jsPDF só roda dentro de um clique no navegador (recibo em PDF) e
+      // depende de partes do Node que não existem no runtime do Cloudflare
+      // usado pelo build de servidor. Sem isso, o build do SSR tenta
+      // empacotar o jsPDF e quebra; com isso, o servidor nem tenta, e o
+      // cliente continua importando normal (sem truque de string).
+      external: ["jspdf"],
+    },
+  },
 });
