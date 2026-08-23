@@ -18,6 +18,7 @@ import {
   Megaphone,
   Wallet,
   Settings,
+  Contact,
 } from "lucide-react";
 import { useAuth, ROLE_LABEL } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,7 @@ const nav = [
   { to: "/entregador", label: "Minha rota", icon: Bike, access: "courier" },
   { to: "/produtos", label: "Produtos", icon: Package, access: "staff" },
   { to: "/clientes", label: "Clientes", icon: Users, access: "staff" },
+  { to: "/crm", label: "CRM", icon: Contact, access: "staff" },
   { to: "/relatorios", label: "Relatórios", icon: BarChart3, access: "staff" },
   { to: "/marketing", label: "Marketing", icon: Megaphone, access: "staff" },
   { to: "/financeiro", label: "Financeiro", icon: Wallet, access: "staff" },

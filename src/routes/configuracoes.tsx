@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { KeyRound, RefreshCw, Lock, Check, Link2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { KeyRound, RefreshCw, Lock, Check, Link2, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
 import { useAuth } from "@/hooks/useAuth";
@@ -10,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 export const Route = createFileRoute("/configuracoes")({
   head: () => ({
@@ -28,11 +30,38 @@ type Status = {
   updated_at?: string | null;
 };
 
+/** types.ts ainda não conhece essa coluna — foi criada na mesma migração deste CRM. */
+type Offer = {
+  id: string;
+  name: string;
+  price: number;
+  item_count: number;
+  active: boolean;
+  created_at: string;
+  repurchase_days: number | null;
+};
+
+/** types.ts ainda não conhece as tabelas/funções novas do CRM (mesma migração do repurchase_days). */
+const db = supabase as unknown as SupabaseClient;
+
+type CrmStatus = {
+  configured: boolean;
+  evolution_api_url?: string | null;
+  evolution_instance?: string | null;
+  followup_message?: string | null;
+  key_tail?: string | null;
+  updated_at?: string | null;
+};
+
 function SettingsPage() {
   const { isAdmin } = useAuth();
   const qc = useQueryClient();
   const [account, setAccount] = useState("");
   const [token, setToken] = useState("");
+  const [evolutionUrl, setEvolutionUrl] = useState("");
+  const [evolutionInstance, setEvolutionInstance] = useState("");
+  const [evolutionKey, setEvolutionKey] = useState("");
+  const [followupMessage, setFollowupMessage] = useState("");
 
   const { data: status } = useQuery({
     queryKey: ["meta-status"],
@@ -44,12 +73,31 @@ function SettingsPage() {
     },
   });
 
+  const { data: crmStatus } = useQuery({
+    queryKey: ["crm-status"],
+    enabled: isAdmin,
+    queryFn: async () => {
+      const { data, error } = await db.rpc("crm_settings_status");
+      if (error) throw error;
+      return data as CrmStatus;
+    },
+  });
+
+  // url/instância/mensagem não são segredo, então voltam pra tela pra
+  // editar sem precisar redigitar — só a api key fica sempre em branco
+  useEffect(() => {
+    if (!crmStatus) return;
+    setEvolutionUrl(crmStatus.evolution_api_url ?? "");
+    setEvolutionInstance(crmStatus.evolution_instance ?? "");
+    setFollowupMessage(crmStatus.followup_message ?? "");
+  }, [crmStatus]);
+
   const { data: offers = [] } = useQuery({
     queryKey: ["offers"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("offers").select("*").order("item_count");
+      const { data, error } = await db.from("offers").select("*").order("item_count");
       if (error) throw error;
-      return data;
+      return data as Offer[];
     },
   });
 
@@ -145,6 +193,35 @@ function SettingsPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["offer-campaigns"] });
       qc.invalidateQueries({ queryKey: ["marketing"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const saveCrm = useMutation({
+    mutationFn: async () => {
+      const { error } = await db.rpc("save_crm_settings", {
+        p_evolution_api_url: evolutionUrl.trim() || null,
+        p_evolution_instance: evolutionInstance.trim() || null,
+        p_evolution_api_key: evolutionKey.trim() || null,
+        p_followup_message: followupMessage,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Configurações do CRM salvas");
+      setEvolutionKey("");
+      qc.invalidateQueries({ queryKey: ["crm-status"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const updateRepurchaseDays = useMutation({
+    mutationFn: async ({ offerId, days }: { offerId: string; days: number | null }) => {
+      const { error } = await db.from("offers").update({ repurchase_days: days }).eq("id", offerId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["offers"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -278,6 +355,110 @@ function SettingsPage() {
               </p>
             </div>
           )}
+        </section>
+
+        <section className="panel p-4 lg:col-span-2">
+          <div className="mb-3 flex items-center gap-2">
+            <MessageCircle className="size-4 text-muted-foreground" />
+            <h2 className="text-sm font-semibold">CRM — Follow-up de recompra</h2>
+            {crmStatus?.configured && (
+              <Badge className="ml-auto border-transparent bg-success text-success-foreground">
+                <Check className="mr-1 size-3" /> Conectado
+              </Badge>
+            )}
+          </div>
+
+          {crmStatus?.configured && (
+            <p className="mb-3 text-xs text-muted-foreground">
+              Chave terminada em <code className="rounded bg-muted px-1">{crmStatus.key_tail}</code>
+              {crmStatus.updated_at &&
+                ` · atualizado em ${new Date(crmStatus.updated_at).toLocaleDateString("pt-BR")}`}
+            </p>
+          )}
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label>URL da Evolution API</Label>
+                <Input
+                  placeholder="https://sua-instancia.exemplo.com"
+                  value={evolutionUrl}
+                  onChange={(e) => setEvolutionUrl(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Nome da instância</Label>
+                <Input
+                  placeholder="vieira-perfumes"
+                  value={evolutionInstance}
+                  onChange={(e) => setEvolutionInstance(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Chave da API</Label>
+                <Input
+                  type="password"
+                  placeholder={crmStatus?.configured ? "deixe vazio para manter a atual" : "cole aqui"}
+                  value={evolutionKey}
+                  onChange={(e) => setEvolutionKey(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  A chave entra e não sai: nem esta tela consegue lê-la depois de salva.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Mensagem de follow-up</Label>
+              <Textarea
+                rows={7}
+                placeholder="Oi {{cliente}}! Faz um tempinho que você levou {{oferta}} com a gente, bora repor?"
+                value={followupMessage}
+                onChange={(e) => setFollowupMessage(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Use <code className="rounded bg-muted px-1">{"{{cliente}}"}</code> e{" "}
+                <code className="rounded bg-muted px-1">{"{{oferta}}"}</code> — são trocados pelo
+                nome do cliente e o nome da oferta na hora de enviar.
+              </p>
+            </div>
+          </div>
+
+          <Button className="mt-3" disabled={saveCrm.isPending} onClick={() => saveCrm.mutate()}>
+            Salvar configurações do CRM
+          </Button>
+
+          <div className="mt-5 border-t border-border pt-4">
+            <p className="mb-1.5 text-sm font-medium">Dias para recompra, por oferta</p>
+            <p className="mb-3 text-xs text-muted-foreground">
+              Em branco, a oferta não entra no acompanhamento do CRM.
+            </p>
+            <div className="space-y-2">
+              {offers.map((o) => (
+                <div key={o.id} className="flex items-center gap-3">
+                  <span className="min-w-0 flex-1 truncate text-sm">{o.name}</span>
+                  <Input
+                    type="number"
+                    min={1}
+                    className="w-24"
+                    placeholder="dias"
+                    defaultValue={o.repurchase_days ?? ""}
+                    onBlur={(e) => {
+                      const raw = e.target.value.trim();
+                      const days = raw ? Number(raw) : null;
+                      if (days === o.repurchase_days) return;
+                      updateRepurchaseDays.mutate({ offerId: o.id, days });
+                    }}
+                  />
+                </div>
+              ))}
+              {offers.length === 0 && (
+                <p className="py-4 text-center text-sm text-muted-foreground">
+                  Nenhuma oferta cadastrada ainda.
+                </p>
+              )}
+            </div>
+          </div>
         </section>
       </div>
     </AppShell>
