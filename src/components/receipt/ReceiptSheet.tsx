@@ -1,7 +1,6 @@
 import { useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useReactToPrint } from "react-to-print";
-import { jsPDF } from "jspdf";
 import { Download, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -96,10 +95,13 @@ export function ReceiptSheet({ saleId, onClose }: { saleId: string | null; onClo
     }
   };
 
-  const downloadPdf = () => {
+  const downloadPdf = async () => {
     try {
       const canvas = buildCanvas();
       if (!canvas) return;
+      // Use the explicit browser build. The package root only exports Node and
+      // browser conditions, so resolving `jspdf` during Worker SSR fails.
+      const { jsPDF } = await import("jspdf/dist/jspdf.es.min.js");
       const pdf = new jsPDF({
         unit: "px",
         format: [canvas.width, canvas.height],
