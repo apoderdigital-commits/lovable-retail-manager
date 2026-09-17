@@ -42,14 +42,6 @@ type Row = {
   customers: number;
 };
 
-type OrganicMatch = {
-  offer_id: string;
-  offer_name: string;
-  sales_count: number;
-  revenue: number;
-  customers: number;
-};
-
 type Ltv = {
   offer_id: string | null;
   offer_name: string;
@@ -141,17 +133,17 @@ function MarketingPage() {
     },
   });
 
-  // venda orgânica cujo valor e quantidade batem com uma oferta ativa —
-  // mesma regra do PDV, só que rodada no banco pra cobrir o histórico
-  const { data: organicMatch = [] } = useQuery({
-    queryKey: ["marketing", "organic-match", from, to],
+  // venda de tráfego sem oferta específica vinculada (avulsa) — o PDV
+  // permite marcar Tráfego em qualquer quantidade, não só nos kits fixos
+  const { data: trafficLoose } = useQuery({
+    queryKey: ["marketing", "traffic-loose", from, to],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("organic_offer_match", {
+      const { data, error } = await supabase.rpc("traffic_loose_performance", {
         p_from: from,
         p_to: to,
       });
       if (error) throw error;
-      return (data ?? []) as OrganicMatch[];
+      return (data ?? [])[0] as { sales_count: number; revenue: number; customers: number };
     },
   });
 
@@ -169,14 +161,8 @@ function MarketingPage() {
   const sales = rows.reduce((s, r) => s + Number(r.sales_count), 0);
   const organicSales = Number(organic?.sales_count ?? 0);
   const organicRevenue = Number(organic?.revenue ?? 0);
-
-  const matchOf = (offerId: string) => organicMatch.find((m) => m.offer_id === offerId);
-  // parte do orgânico que bate em valor/quantidade com uma oferta; o resto
-  // é venda avulsa "de verdade", sem coincidir com nenhum kit
-  const matchedOrganicSales = organicMatch.reduce((s, m) => s + Number(m.sales_count), 0);
-  const matchedOrganicRevenue = organicMatch.reduce((s, m) => s + Number(m.revenue), 0);
-  const unmatchedOrganicSales = Math.max(0, organicSales - matchedOrganicSales);
-  const unmatchedOrganicRevenue = Math.max(0, organicRevenue - matchedOrganicRevenue);
+  const looseSales = Number(trafficLoose?.sales_count ?? 0);
+  const looseRevenue = Number(trafficLoose?.revenue ?? 0);
 
   return (
     <AppShell title="Marketing" subtitle="Campanhas cruzadas com as vendas de cada oferta">
@@ -199,9 +185,9 @@ function MarketingPage() {
         </Button>
       </div>
 
-      <div className="mb-4 grid gap-4 lg:grid-cols-2">
+      <div className="mb-4 grid gap-4 lg:grid-cols-3">
         <div className="rounded-xl border border-border p-4">
-          <h2 className="mb-3 text-sm font-semibold">Venda tráfego</h2>
+          <h2 className="mb-3 text-sm font-semibold">Tráfego · oferta</h2>
           <div className="grid grid-cols-2 gap-3">
             <Tile label="Investido" value={brl(spend)} />
             <Tile label="Faturamento" value={brl(revenue)} />
@@ -214,6 +200,22 @@ function MarketingPage() {
               label="Custo por venda"
               value={show(per(spend, sales), brl)}
               hint={`${sales} venda(s)`}
+            />
+          </div>
+        </div>
+        <div className="rounded-xl border border-border p-4">
+          <h2 className="mb-3 text-sm font-semibold">Tráfego · avulso</h2>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Veio de anúncio, mas não é nenhum kit cadastrado.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <Tile label="Vendas" value={String(looseSales)} />
+            <Tile label="Faturamento" value={brl(looseRevenue)} />
+            <Tile label="Clientes" value={String(trafficLoose?.customers ?? 0)} />
+            <Tile
+              label="Ticket médio"
+              value={show(per(looseRevenue, looseSales), brl)}
+              hint={`${looseSales} venda(s)`}
             />
           </div>
         </div>
@@ -286,8 +288,7 @@ function MarketingPage() {
         <div className="border-b border-border px-4 py-3">
           <h2 className="text-sm font-semibold">Vendas por oferta e origem</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Orgânico entra aqui quando a quantidade de itens e o valor da venda batem com a oferta
-            — mesmo sem ter vindo de anúncio.
+            Tráfego e orgânico vêm de como a venda foi marcada no PDV, não de coincidência de valor.
           </p>
         </div>
         <Table>
@@ -310,37 +311,24 @@ function MarketingPage() {
                 <TableCell className="text-right font-medium">{brl(Number(r.revenue))}</TableCell>
               </TableRow>
             ))}
-            {rows.map((r) => {
-              const m = matchOf(r.offer_id);
-              return (
-                <TableRow key={`${r.offer_id}-organico`} className="bg-muted/40">
-                  <TableCell className="font-medium">{r.offer_name}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    <span className="flex items-center gap-1.5">
-                      <Sprout className="size-3.5" /> Orgânico
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right">{m?.sales_count ?? 0}</TableCell>
-                  <TableCell className="text-right">{m?.customers ?? 0}</TableCell>
-                  <TableCell className="text-right font-medium">
-                    {brl(Number(m?.revenue ?? 0))}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-            {unmatchedOrganicSales > 0 && (
-              <TableRow className="bg-muted/40">
-                <TableCell className="font-medium text-muted-foreground">Sem oferta correspondente</TableCell>
-                <TableCell className="text-muted-foreground">
-                  <span className="flex items-center gap-1.5">
-                    <Sprout className="size-3.5" /> Orgânico
-                  </span>
-                </TableCell>
-                <TableCell className="text-right">{unmatchedOrganicSales}</TableCell>
-                <TableCell className="text-right text-muted-foreground">—</TableCell>
-                <TableCell className="text-right font-medium">{brl(unmatchedOrganicRevenue)}</TableCell>
-              </TableRow>
-            )}
+            <TableRow className="bg-muted/40">
+              <TableCell className="font-medium text-muted-foreground">Avulso (sem kit)</TableCell>
+              <TableCell className="text-muted-foreground">Tráfego</TableCell>
+              <TableCell className="text-right">{looseSales}</TableCell>
+              <TableCell className="text-right">{trafficLoose?.customers ?? 0}</TableCell>
+              <TableCell className="text-right font-medium">{brl(looseRevenue)}</TableCell>
+            </TableRow>
+            <TableRow className="bg-muted/40">
+              <TableCell className="font-medium text-muted-foreground">—</TableCell>
+              <TableCell className="text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <Sprout className="size-3.5" /> Orgânico
+                </span>
+              </TableCell>
+              <TableCell className="text-right">{organicSales}</TableCell>
+              <TableCell className="text-right">{organic?.customers ?? 0}</TableCell>
+              <TableCell className="text-right font-medium">{brl(organicRevenue)}</TableCell>
+            </TableRow>
             {rows.length === 0 && (
               <TableRow>
                 <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">

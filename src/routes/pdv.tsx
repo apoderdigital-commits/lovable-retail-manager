@@ -238,6 +238,7 @@ function PdvPage() {
         ...(addr ? { p_address: addr } : {}),
         ...(hood ? { p_neighborhood: hood } : {}),
         ...(origin === "traffic" && matchedOffer ? { p_offer: matchedOffer.id } : {}),
+        p_is_traffic: origin === "traffic",
         p_discount: discountValue,
         p_counter_sale: counterSale,
       });
@@ -263,13 +264,7 @@ function PdvPage() {
 
   const missingCustomer = mode === "delivery" && customerId === "none";
   const missingAddress = mode === "delivery" && !address.trim();
-  const missingOfferMatch = origin === "traffic" && !matchedOffer;
-  const blocked =
-    finish.isPending ||
-    cart.length === 0 ||
-    missingOfferMatch ||
-    missingCustomer ||
-    missingAddress;
+  const blocked = finish.isPending || cart.length === 0 || missingCustomer || missingAddress;
 
   return (
     <AppShell
@@ -429,9 +424,8 @@ function PdvPage() {
                   {brl(subtotal)}.
                 </p>
               ) : (
-                <p className="mt-2 text-xs text-warning">
-                  O valor precisa bater com uma oferta ativa (ex.: 4 itens por R$ 100 ou 10 por
-                  R$ 200) para contar como tráfego. Ajuste os itens ou marque como Orgânico.
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Venda de tráfego avulsa, sem oferta específica vinculada.
                 </p>
               )
             ) : (
