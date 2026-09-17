@@ -1,7 +1,7 @@
 import { useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useReactToPrint } from "react-to-print";
-import { Download, Printer } from "lucide-react";
+import { Copy, Download, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { usePrintSettings, printPageStyle } from "@/hooks/use-print-settings";
@@ -81,6 +81,28 @@ export function ReceiptSheet({ saleId, onClose }: { saleId: string | null; onClo
     return renderReceiptCanvas(receiptSale, receiptItems, widthPx(paperWidth));
   };
 
+  // agora que o canvas é desenhado na mão (sem html2canvas), copiar pra
+  // área de transferência não esbarra mais no bloqueio de eval do CSP
+  const copyImage = () => {
+    try {
+      const canvas = buildCanvas();
+      if (!canvas) return;
+      canvas.toBlob(async (blob) => {
+        if (!blob) return;
+        try {
+          await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+          toast.success("Recibo copiado");
+        } catch (e) {
+          console.error("copyImage", e);
+          toast.error("Não foi possível copiar — seu navegador pode não suportar isso");
+        }
+      });
+    } catch (e) {
+      console.error("copyImage", e);
+      toast.error("Não foi possível copiar o recibo");
+    }
+  };
+
   const downloadImage = () => {
     try {
       const canvas = buildCanvas();
@@ -129,7 +151,10 @@ export function ReceiptSheet({ saleId, onClose }: { saleId: string | null; onClo
           )}
         </div>
 
-        <div className="grid grid-cols-3 gap-2 border-t border-border pt-3">
+        <div className="grid grid-cols-2 gap-2 border-t border-border pt-3">
+          <Button variant="outline" size="sm" disabled={!receiptSale} onClick={copyImage}>
+            <Copy className="mr-1.5 size-3.5" /> Copiar
+          </Button>
           <Button variant="outline" size="sm" disabled={!receiptSale} onClick={downloadImage}>
             <Download className="mr-1.5 size-3.5" /> Imagem
           </Button>
