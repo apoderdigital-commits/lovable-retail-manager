@@ -34,7 +34,7 @@ function Dashboard() {
       startOfMonth.setDate(1);
       startOfMonth.setHours(0, 0, 0, 0);
 
-      const [today, month, products, recent] = await Promise.all([
+      const [today, month, products, recent, itemsToday] = await Promise.all([
         supabase.from("sales").select("total").gte("created_at", startOfDay.toISOString()),
         supabase.from("sales").select("total").gte("created_at", startOfMonth.toISOString()),
         supabase.from("products").select("*").order("stock", { ascending: true }),
@@ -43,11 +43,16 @@ function Dashboard() {
           .select("id, sale_number, total, payment_method, created_at, customers(name)")
           .order("created_at", { ascending: false })
           .limit(8),
+        supabase
+          .from("sale_items")
+          .select("product_id, quantity")
+          .gte("created_at", startOfDay.toISOString()),
       ]);
 
       const todayRows = today.data ?? [];
       const monthRows = month.data ?? [];
       const allProducts = products.data ?? [];
+      const itemsTodayRows = itemsToday.data ?? [];
 
       return {
         todayTotal: todayRows.reduce((s, r) => s + Number(r.total), 0),
@@ -57,6 +62,11 @@ function Dashboard() {
         lowStock: allProducts.filter((p) => p.stock <= p.min_stock),
         stockValue: allProducts.reduce((s, p) => s + Number(p.price) * p.stock, 0),
         recent: recent.data ?? [],
+        // "itens vendidos" conta cada unidade (uma venda de 3 perfumes
+        // iguais soma 3); "produtos diferentes" conta SKUs distintos —
+        // números bem diferentes numa loja que vende em kit
+        itemsSoldToday: itemsTodayRows.reduce((s, r) => s + r.quantity, 0),
+        distinctProductsToday: new Set(itemsTodayRows.map((r) => r.product_id)).size,
       };
     },
   });
@@ -73,13 +83,18 @@ function Dashboard() {
         </Button>
       }
     >
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <Metric
           label="Vendas hoje"
           value={brl(data?.todayTotal ?? 0)}
           hint={`${data?.todayCount ?? 0} venda(s) registrada(s)`}
         />
         <Metric label="Faturamento do mês" value={brl(data?.monthTotal ?? 0)} tone="accent" />
+        <Metric
+          label="Itens vendidos hoje"
+          value={String(data?.itemsSoldToday ?? 0)}
+          hint={`em ${data?.distinctProductsToday ?? 0} produto(s) diferente(s)`}
+        />
         <Metric
           label="Produtos cadastrados"
           value={String(data?.productCount ?? 0)}
