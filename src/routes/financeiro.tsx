@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Wallet, SlidersHorizontal } from "lucide-react";
+import { Wallet, SlidersHorizontal, Package } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
 import { useAuth } from "@/hooks/useAuth";
@@ -51,6 +51,15 @@ type ByOffer = {
   ad_cost: number;
 };
 
+type ByProduct = {
+  product_id: string;
+  product_name: string;
+  quantity: number;
+  unit_cost: number;
+  total_cost: number;
+  revenue: number;
+};
+
 const firstOfMonth = () => {
   const d = new Date();
   return new Date(d.getFullYear(), d.getMonth(), 1).toLocaleDateString("sv-SE");
@@ -83,6 +92,18 @@ function FinancePage() {
       });
       if (error) throw error;
       return (data ?? []) as ByOffer[];
+    },
+  });
+
+  const { data: byProduct = [] } = useQuery({
+    queryKey: ["finance", "by-product", from, to],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("product_cost_breakdown", {
+        p_from: from,
+        p_to: to,
+      });
+      if (error) throw error;
+      return (data ?? []) as ByProduct[];
     },
   });
 
@@ -210,6 +231,55 @@ function FinancePage() {
               <TableRow>
                 <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
                   Nenhuma venda entregue no período.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      <div className="panel overflow-x-auto">
+        <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+          <Package className="size-4 text-muted-foreground" />
+          <div>
+            <h2 className="text-sm font-semibold">Custo de produto</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Quantidade e custo de catálogo de cada produto vendido no período. Pode não bater
+              exato com "Custo dos produtos" acima quando o custo do kit difere da soma dos custos
+              individuais.
+            </p>
+          </div>
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Produto</TableHead>
+              <TableHead className="text-right">Qtd. vendida</TableHead>
+              <TableHead className="text-right">Custo unitário</TableHead>
+              <TableHead className="text-right">Custo total</TableHead>
+              <TableHead className="text-right">Faturamento</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {byProduct.map((p) => (
+              <TableRow key={p.product_id}>
+                <TableCell className="font-medium">{p.product_name}</TableCell>
+                <TableCell className="text-right">{p.quantity}</TableCell>
+                <TableCell className="text-right text-muted-foreground">
+                  {brl(Number(p.unit_cost))}
+                </TableCell>
+                <TableCell className="text-right font-medium">
+                  {brl(Number(p.total_cost))}
+                </TableCell>
+                <TableCell className="text-right text-muted-foreground">
+                  {brl(Number(p.revenue))}
+                </TableCell>
+              </TableRow>
+            ))}
+            {byProduct.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
+                  Nenhum produto vendido no período.
                 </TableCell>
               </TableRow>
             )}

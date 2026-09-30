@@ -12,6 +12,7 @@ import {
   Search,
   Store,
   Truck,
+  User,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -37,6 +38,7 @@ import {
 } from "@/components/ui/table";
 import { brl, dateTime } from "@/lib/format";
 import { ReceiptSheet } from "@/components/receipt/ReceiptSheet";
+import { MultiSelect } from "@/components/ui/multi-select";
 
 export const Route = createFileRoute("/vendas")({
   head: () => ({
@@ -82,18 +84,26 @@ function paymentIcon(method: string) {
 function SalesHistoryPage() {
   const qc = useQueryClient();
   const [term, setTerm] = useState("");
+  const [sellerFilter, setSellerFilter] = useState<string[]>([]);
+  const [day, setDay] = useState("");
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [printingId, setPrintingId] = useState<string | null>(null);
 
+  // sem filtro de dia: últimas 300, pra navegação rápida do dia a dia. Com
+  // dia marcado, busca o dia inteiro sem limite — senão um dia antigo
+  // podia sumir da lista só por estar fora das 300 mais recentes.
   const { data: sales = [], isLoading } = useQuery({
-    queryKey: ["sales-history"],
+    queryKey: ["sales-history", day],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("sales")
         .select("*, customers(name, phone, customer_type)")
-        .order("created_at", { ascending: false })
-        .limit(300);
+        .order("created_at", { ascending: false });
+      q = day
+        ? q.gte("created_at", `${day}T00:00:00`).lte("created_at", `${day}T23:59:59`)
+        : q.limit(300);
+      const { data, error } = await q;
       if (error) throw error;
       return data;
     },
@@ -152,7 +162,15 @@ function SalesHistoryPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const sellerOptions = sellers.map((p) => ({
+    value: p.id,
+    label: p.full_name || p.email || "—",
+  }));
+
   const filtered = sales.filter((s) => {
+    if (sellerFilter.length > 0 && !(s.seller_id && sellerFilter.includes(s.seller_id))) {
+      return false;
+    }
     if (!term.trim()) return true;
     const name = s.customers?.name ?? "";
     const phone = s.customers?.phone ?? "";
@@ -197,14 +215,35 @@ function SalesHistoryPage() {
           <SummaryStat label="Este mês" count={summary.mes.count} total={summary.mes.total} />
         </div>
 
-        <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-          <Search className="size-4 shrink-0 text-muted-foreground" />
-          <input
-            className="w-full max-w-xs bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-            placeholder="Buscar por cliente, telefone ou número"
-            value={term}
-            onChange={(e) => setTerm(e.target.value)}
+        <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
+          <div className="flex min-w-40 flex-1 items-center gap-2">
+            <Search className="size-4 shrink-0 text-muted-foreground" />
+            <input
+              className="w-full max-w-xs bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+              placeholder="Buscar por cliente, telefone ou número"
+              value={term}
+              onChange={(e) => setTerm(e.target.value)}
+            />
+          </div>
+          <MultiSelect
+            options={sellerOptions}
+            selected={sellerFilter}
+            onChange={setSellerFilter}
+            placeholder="Vendedor"
+            allLabel="Todos os vendedores"
+            icon={<User className="size-3.5" />}
           />
+          <input
+            type="date"
+            className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+            value={day}
+            onChange={(e) => setDay(e.target.value)}
+          />
+          {day && (
+            <Button variant="ghost" size="sm" className="h-9" onClick={() => setDay("")}>
+              Limpar dia
+            </Button>
+          )}
         </div>
 
         <Table>
