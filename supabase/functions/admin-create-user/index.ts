@@ -85,9 +85,11 @@ Deno.serve(async (req) => {
   // o trigger on_auth_user_created já cria o profile; garante o nome
   await admin.from("profiles").update({ full_name: fullName, email }).eq("id", userId);
 
-  const { error: roleError } = await admin
-    .from("user_roles")
-    .insert({ user_id: userId, role });
+  // o mesmo trigger já dá 'vendedor' a toda conta nova; troca pelo papel
+  // escolhido, senão o insert duplica (vendedor) ou soma dois papéis (os demais)
+  const { error: clearError } = await admin.from("user_roles").delete().eq("user_id", userId);
+  const roleError =
+    clearError ?? (await admin.from("user_roles").insert({ user_id: userId, role })).error;
 
   if (roleError) {
     // conta sem papel não enxerga nada — não deixa esse estado de pé
