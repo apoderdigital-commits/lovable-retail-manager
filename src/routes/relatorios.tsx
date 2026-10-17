@@ -10,6 +10,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -55,7 +56,7 @@ function ReportsPage() {
           .order("created_at", { ascending: false }),
         supabase
           .from("sale_items")
-          .select("product_name, quantity, total, created_at")
+          .select("product_name, quantity, total, created_at, products(product_categories(name))")
           .gte("created_at", `${from}T00:00:00`)
           .lte("created_at", `${to}T23:59:59`),
       ]);
@@ -89,10 +90,22 @@ function ReportsPage() {
     .sort((a, b) => b[1].total - a[1].total)
     .slice(0, 8);
 
+  // categoria atual do produto; item sem produto vinculado ou sem categoria cai em "Sem categoria"
+  const byCategory = Object.entries(
+    items.reduce<Record<string, { qty: number; total: number }>>((acc, i) => {
+      const name = i.products?.product_categories?.name ?? "Sem categoria";
+      const cur = acc[name] ?? { qty: 0, total: 0 };
+      acc[name] = { qty: cur.qty + i.quantity, total: cur.total + Number(i.total) };
+      return acc;
+    }, {}),
+  ).sort((a, b) => b[1].qty - a[1].qty);
+  const categoryQty = byCategory.reduce((s, [, v]) => s + v.qty, 0);
+  const categoryTotal = byCategory.reduce((s, [, v]) => s + v.total, 0);
+
   return (
     <AppShell
       title="Relatórios"
-      subtitle="Faturamento, ticket médio, formas de pagamento e produtos campeões"
+      subtitle="Faturamento, ticket médio, formas de pagamento, produtos campeões e categorias"
       actions={
         <div className="flex items-end gap-2">
           <div className="space-y-1">
@@ -156,6 +169,46 @@ function ReportsPage() {
           </ul>
         </section>
       </div>
+
+      <section className="panel mt-5 overflow-hidden">
+        <header className="border-b border-border px-4 py-3">
+          <h2 className="font-display text-base font-semibold">Vendas por categoria</h2>
+        </header>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Categoria</TableHead>
+              <TableHead className="text-right">Quantidade</TableHead>
+              <TableHead className="text-right">Faturamento</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {byCategory.map(([name, v]) => (
+              <TableRow key={name}>
+                <TableCell className="font-medium">{name}</TableCell>
+                <TableCell className="text-right">{v.qty} un</TableCell>
+                <TableCell className="text-right text-muted-foreground">{brl(v.total)}</TableCell>
+              </TableRow>
+            ))}
+            {byCategory.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={3} className="py-10 text-center text-muted-foreground">
+                  Nenhum item vendido no período.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+          {byCategory.length > 0 && (
+            <TableFooter>
+              <TableRow>
+                <TableCell className="font-semibold">Total no período</TableCell>
+                <TableCell className="text-right font-semibold">{categoryQty} un</TableCell>
+                <TableCell className="text-right font-semibold">{brl(categoryTotal)}</TableCell>
+              </TableRow>
+            </TableFooter>
+          )}
+        </Table>
+      </section>
 
       <section className="panel mt-5 overflow-hidden">
         <header className="border-b border-border px-4 py-3">
