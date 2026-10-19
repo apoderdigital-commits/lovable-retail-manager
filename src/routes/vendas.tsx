@@ -39,6 +39,7 @@ import {
 import { brl, dateTime } from "@/lib/format";
 import { ReceiptSheet } from "@/components/receipt/ReceiptSheet";
 import { MultiSelect } from "@/components/ui/multi-select";
+import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/vendas")({
   head: () => ({
@@ -83,6 +84,7 @@ function paymentIcon(method: string) {
 
 function SalesHistoryPage() {
   const qc = useQueryClient();
+  const { isAdmin } = useAuth();
   const [term, setTerm] = useState("");
   const [sellerFilter, setSellerFilter] = useState<string[]>([]);
   const [day, setDay] = useState("");
@@ -264,7 +266,12 @@ function SalesHistoryPage() {
             {filtered.map((s) => {
               const PaymentIcon = paymentIcon(s.payment_method);
               const cancelled = s.status === "cancelled";
-              const podeCancel = !cancelled && s.status !== "delivered";
+              // balcão concluído (sem entregador nem rota) só admin cancela:
+              // a venda já foi paga e o estoque volta pra prateleira
+              const balcaoConcluido =
+                s.status === "delivered" && !s.courier_id && !s.route_id;
+              const podeCancel =
+                !cancelled && (s.status !== "delivered" || (balcaoConcluido && isAdmin));
               const items = itemCounts.get(s.id) ?? 0;
 
               return (
@@ -304,10 +311,15 @@ function SalesHistoryPage() {
                     )}
                   </TableCell>
                   <TableCell className="text-center">
-                    {s.reason ? (
+                    {s.notes || s.reason ? (
                       <MessageSquare
                         className="mx-auto size-4 text-muted-foreground"
-                        title={s.reason}
+                        title={[
+                          s.notes && `Observação: ${s.notes}`,
+                          s.reason && `Motivo: ${s.reason}`,
+                        ]
+                          .filter(Boolean)
+                          .join("\n")}
                       />
                     ) : (
                       <span className="text-muted-foreground">—</span>

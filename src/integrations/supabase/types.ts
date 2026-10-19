@@ -533,7 +533,9 @@ export type Database = {
           discount: number
           fee_due: boolean
           id: string
+          is_traffic: boolean
           neighborhood: string | null
+          notes: string | null
           offer_id: string | null
           payment_method: string
           proof_url: string | null
@@ -556,7 +558,9 @@ export type Database = {
           discount?: number
           fee_due?: boolean
           id?: string
+          is_traffic?: boolean
           neighborhood?: string | null
+          notes?: string | null
           offer_id?: string | null
           payment_method?: string
           proof_url?: string | null
@@ -579,7 +583,9 @@ export type Database = {
           discount?: number
           fee_due?: boolean
           id?: string
+          is_traffic?: boolean
           neighborhood?: string | null
+          notes?: string | null
           offer_id?: string | null
           payment_method?: string
           proof_url?: string | null
@@ -699,7 +705,9 @@ export type Database = {
           p_customer: string
           p_discount?: number
           p_items: Json
+          p_is_traffic?: boolean
           p_neighborhood?: string
+          p_notes?: string
           p_offer?: string
           p_payment_method: string
         }
@@ -712,7 +720,9 @@ export type Database = {
           discount: number
           fee_due: boolean
           id: string
+          is_traffic: boolean
           neighborhood: string | null
+          notes: string | null
           offer_id: string | null
           payment_method: string
           proof_url: string | null
@@ -865,7 +875,9 @@ export type Database = {
           discount: number
           fee_due: boolean
           id: string
+          is_traffic: boolean
           neighborhood: string | null
+          notes: string | null
           offer_id: string | null
           payment_method: string
           proof_url: string | null

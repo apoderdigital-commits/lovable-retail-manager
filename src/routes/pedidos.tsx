@@ -162,6 +162,11 @@ function OrdersPage() {
                   {o.customers?.customer_type === "wholesale" && (
                     <p className="text-xs text-muted-foreground">Atacado</p>
                   )}
+                  {o.notes && (
+                    <p className="max-w-56 truncate text-xs text-muted-foreground" title={o.notes}>
+                      Obs.: {o.notes}
+                    </p>
+                  )}
                 </TableCell>
                 <TableCell className="text-muted-foreground">{o.neighborhood ?? "—"}</TableCell>
                 <TableCell className="text-right font-medium">{brl(Number(o.total))}</TableCell>
@@ -272,7 +277,13 @@ function OrderDetail({
   sale,
   onClose,
 }: {
-  sale: { id: string; sale_number: number; total: number; reason: string | null } | null;
+  sale: {
+    id: string;
+    sale_number: number;
+    total: number;
+    reason: string | null;
+    notes: string | null;
+  } | null;
   onClose: () => void;
 }) {
   const { data: items = [] } = useQuery({
@@ -323,6 +334,10 @@ function OrderDetail({
             <span>{brl(Number(sale?.total ?? 0))}</span>
           </div>
         </div>
+
+        {sale?.notes && (
+          <p className="rounded-md bg-muted px-3 py-2 text-sm">Observação: {sale.notes}</p>
+        )}
 
         {sale?.reason && (
           <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">

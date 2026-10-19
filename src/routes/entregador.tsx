@@ -350,6 +350,7 @@ type Stop = {
   payment_method: string;
   delivery_address: string | null;
   neighborhood: string | null;
+  notes: string | null;
   customers: { name: string; phone: string | null } | null;
 };
 
@@ -438,6 +439,10 @@ function StopCard({
           #{stop.sale_number}
         </Badge>
       </div>
+
+      {stop.notes && (
+        <p className="mt-2 rounded-md bg-muted px-3 py-2 text-sm">Obs.: {stop.notes}</p>
+      )}
 
       <div className="mt-3 flex items-center justify-between">
         <span className="font-display text-lg font-semibold">{brl(Number(stop.total))}</span>

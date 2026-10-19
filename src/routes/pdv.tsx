@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -77,6 +78,7 @@ function PdvPage() {
   const [discount, setDiscount] = useState("0");
   const [address, setAddress] = useState("");
   const [neighborhood, setNeighborhood] = useState("");
+  const [notes, setNotes] = useState("");
   const [receiptSaleId, setReceiptSaleId] = useState<string | null>(null);
 
   const { data: products = [] } = useQuery({
@@ -172,16 +174,17 @@ function PdvPage() {
   const units = cart.reduce((s, i) => s + i.quantity, 0);
 
   const subtotal = lines.reduce((s, l) => s + l.unit * l.quantity, 0);
-  const discountValue = Math.min(Number(discount || 0), subtotal);
-  const total = subtotal - discountValue;
 
-  // qual oferta esse carrinho representa, descoberto pela combinação de
-  // quantidade de itens e valor total — "4 itens por R$100" só bate se os
-  // dois baterem, não só o valor
+  // a oferta vale pela quantidade de itens (10 frascos = "10 por R$ 200"),
+  // em venda orgânica ou de tráfego. Só entra quando sai mais barato que a
+  // tabela do cliente — atacado já pode estar abaixo do preço da oferta.
   const matchedOffer =
     cart.length > 0
-      ? offers.find((o) => o.item_count === units && Math.abs(Number(o.price) - subtotal) < 0.01)
+      ? offers.find((o) => o.item_count === units && Number(o.price) <= subtotal + 0.005)
       : undefined;
+  const base = matchedOffer ? Number(matchedOffer.price) : subtotal;
+  const discountValue = Math.min(Number(discount || 0), base);
+  const total = base - discountValue;
 
   const add = (p: (typeof products)[number]) => {
     const inCart = cart.find((i) => i.productId === p.id)?.quantity ?? 0;
@@ -223,6 +226,7 @@ function PdvPage() {
     setCustomerId("none");
     setAddress("");
     setNeighborhood("");
+    setNotes("");
   };
 
   const finish = useMutation({
@@ -237,10 +241,11 @@ function PdvPage() {
         p_items: cart.map((i) => ({ product_id: i.productId, quantity: i.quantity })),
         ...(addr ? { p_address: addr } : {}),
         ...(hood ? { p_neighborhood: hood } : {}),
-        ...(origin === "traffic" && matchedOffer ? { p_offer: matchedOffer.id } : {}),
+        ...(matchedOffer ? { p_offer: matchedOffer.id } : {}),
         p_is_traffic: origin === "traffic",
         p_discount: discountValue,
         p_counter_sale: counterSale,
+        ...(notes.trim() ? { p_notes: notes.trim() } : {}),
       });
 
       if (error) throw error;
@@ -270,8 +275,8 @@ function PdvPage() {
     <AppShell
       title="Nova venda"
       subtitle={
-        origin === "traffic" && matchedOffer
-          ? `${matchedOffer.name} · tráfego`
+        matchedOffer
+          ? `${matchedOffer.name} · ${origin === "traffic" ? "tráfego" : "orgânico"}`
           : isWholesale
             ? "Preços de atacado aplicados"
             : "Preços de varejo"
@@ -417,17 +422,16 @@ function PdvPage() {
                 </button>
               ))}
             </div>
-            {origin === "traffic" ? (
-              matchedOffer ? (
-                <p className="mt-2 text-xs text-success">
-                  Bate com a oferta <strong>{matchedOffer.name}</strong> — {units} item(ns) ·{" "}
-                  {brl(subtotal)}.
-                </p>
-              ) : (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Venda de tráfego avulsa, sem oferta específica vinculada.
-                </p>
-              )
+            {matchedOffer ? (
+              <p className="mt-2 text-xs text-success">
+                Oferta <strong>{matchedOffer.name}</strong> aplicada — {units} item(ns) por{" "}
+                {brl(Number(matchedOffer.price))}
+                {origin === "traffic" ? ", venda de tráfego." : ", venda orgânica."}
+              </p>
+            ) : origin === "traffic" ? (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Venda de tráfego avulsa, sem oferta específica vinculada.
+              </p>
             ) : (
               <p className="mt-2 text-xs text-muted-foreground">Venda orgânica, fora do tráfego.</p>
             )}
@@ -544,11 +548,27 @@ function PdvPage() {
               </div>
             </div>
 
+            <div className="space-y-1.5">
+              <Label>Observação do pedido</Label>
+              <Textarea
+                rows={2}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Ex.: embrulhar para presente, entregar após as 18h..."
+              />
+            </div>
+
             <div className="rounded-lg bg-secondary p-3 text-sm">
               <div className="flex justify-between text-muted-foreground">
-                <span>{origin === "traffic" && matchedOffer ? matchedOffer.name : "Subtotal"}</span>
-                <span>{brl(subtotal)}</span>
+                <span>Subtotal</span>
+                <span className={matchedOffer ? "line-through" : undefined}>{brl(subtotal)}</span>
               </div>
+              {matchedOffer && (
+                <div className="flex justify-between text-success">
+                  <span>{matchedOffer.name}</span>
+                  <span>{brl(base)}</span>
+                </div>
+              )}
               <div className="flex justify-between text-muted-foreground">
                 <span>Desconto</span>
                 <span>-{brl(discountValue)}</span>
