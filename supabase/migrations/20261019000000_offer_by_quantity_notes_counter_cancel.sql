@@ -10,7 +10,7 @@
 --      estoque voltando pra prateleira.
 
 
--- ─── 1. Observação do pedido ────────────────────────────────────────────
+-- ---- 1. Observação do pedido ----
 
 alter table sales add column if not exists notes text;
 
@@ -19,7 +19,7 @@ comment on column sales.offer_id is
   'Oferta (kit) aplicada pela quantidade de itens. Não indica origem — ver is_traffic.';
 
 
--- ─── 2. create_order com observação e sem forçar tráfego pela oferta ────
+-- ---- 2. create_order com observação e sem forçar tráfego pela oferta ----
 
 drop function if exists create_order(uuid, text, jsonb, text, text, numeric, boolean, uuid, boolean);
 
@@ -145,7 +145,7 @@ grant execute on function create_order(uuid, text, jsonb, text, text, numeric, b
   to authenticated;
 
 
--- ─── 3. transition_sale: cancelar venda de balcão concluída ─────────────
+-- ---- 3. transition_sale: cancelar venda de balcão concluída ----
 -- balcão = concluída sem entregador nem rota. Só admin cancela, porque a
 -- venda já foi paga; o estoque baixado volta pra prateleira.
 
@@ -282,7 +282,7 @@ begin
 end $$;
 
 
--- ─── 4. Marketing: oferta não é mais sinônimo de tráfego ────────────────
+-- ---- 4. Marketing: oferta não é mais sinônimo de tráfego ----
 
 -- desempenho da campanha conta só venda de tráfego que usou a oferta
 create or replace function offer_performance(p_from date, p_to date)
