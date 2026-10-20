@@ -463,6 +463,14 @@ function PdvPage() {
             )}
           </div>
 
+          {/* contador ao vivo: sobe a cada produto adicionado */}
+          <div className="flex items-center justify-between border-b border-border bg-muted/40 px-4 py-2 text-sm">
+            <span className="text-muted-foreground">Carrinho</span>
+            <span className="font-semibold">
+              {units} {units === 1 ? "item" : "itens"}
+            </span>
+          </div>
+
           <div className="flex-1 divide-y divide-border">
             {lines.map((l) => (
               <div key={l.productId} className="flex items-center gap-2 px-4 py-3">
@@ -612,6 +620,10 @@ function PdvPage() {
             </div>
 
             <div className="rounded-lg bg-secondary p-3 text-sm">
+              <div className="flex justify-between font-medium">
+                <span>Total de itens</span>
+                <span>{units}</span>
+              </div>
               <div className="flex justify-between text-muted-foreground">
                 <span>Subtotal</span>
                 <span className={matchedOffer ? "line-through" : undefined}>{brl(subtotal)}</span>

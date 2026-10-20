@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -90,17 +90,26 @@ export function CustomerFormFields({
   onChange,
 }: {
   form: CustomerFormValues;
-  onChange: (form: CustomerFormValues) => void;
+  // o setState do form: aceita função pra atualizar sempre sobre o estado atual
+  onChange: Dispatch<SetStateAction<CustomerFormValues>>;
 }) {
   const [cepBusy, setCepBusy] = useState(false);
+  // último CEP já consultado: colar dispara a busca e sair do campo dispararia
+  // de novo — a segunda resposta chegava atrasada e sobrescrevia o que a
+  // pessoa já tinha digitado depois
+  const lastCep = useRef("");
+
+  // sempre a partir do estado mais recente (updater), nunca de uma cópia do
+  // form guardada quando a busca começou
   const set = <K extends keyof CustomerFormValues>(key: K, value: CustomerFormValues[K]) =>
-    onChange({ ...form, [key]: value });
+    onChange((prev) => ({ ...prev, [key]: value }));
 
   // ViaCEP: serviço público, sem chave. preenche rua, bairro e cidade; o
   // número fica com a pessoa, porque CEP não sabe número.
   const buscarCep = async (raw: string) => {
     const cep = raw.replace(/\D/g, "");
-    if (cep.length !== 8) return;
+    if (cep.length !== 8 || cep === lastCep.current) return;
+    lastCep.current = cep;
     setCepBusy(true);
     try {
       const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
@@ -109,17 +118,20 @@ export function CustomerFormFields({
         toast.error("CEP não encontrado");
         return;
       }
-      // o form aqui é o de antes da colagem (CEP ainda vazio): sem repor o
-      // CEP, preencher o endereço apagava o número que acabou de ser colado
-      onChange({
-        ...form,
+      onChange((prev) => ({
+        ...prev,
         zip_code: `${cep.slice(0, 5)}-${cep.slice(5)}`,
-        address: data.logradouro || form.address,
-        neighborhood: data.bairro || form.neighborhood,
-        city: data.localidade ? `${data.localidade}${data.uf ? ` - ${data.uf}` : ""}` : form.city,
-      });
+        // se a pessoa já completou a rua com o número, não apaga
+        address:
+          data.logradouro && !prev.address.startsWith(data.logradouro)
+            ? data.logradouro
+            : prev.address,
+        neighborhood: data.bairro || prev.neighborhood,
+        city: data.localidade ? `${data.localidade}${data.uf ? ` - ${data.uf}` : ""}` : prev.city,
+      }));
       toast.success("Endereço preenchido. Falta o número.");
     } catch {
+      lastCep.current = "";
       toast.error("Não foi possível consultar o CEP agora");
     } finally {
       setCepBusy(false);
@@ -185,7 +197,10 @@ export function CustomerFormFields({
                 onChange={(e) => {
                   const v = e.target.value;
                   set("zip_code", v);
-                  if (v.replace(/\D/g, "").length === 8) buscarCep(v);
+                  const digits = v.replace(/\D/g, "");
+                  // apagou o CEP: libera consultar de novo (próximo cliente)
+                  if (digits.length < 8) lastCep.current = "";
+                  if (digits.length === 8) buscarCep(v);
                 }}
                 onBlur={(e) => buscarCep(e.target.value)}
               />
