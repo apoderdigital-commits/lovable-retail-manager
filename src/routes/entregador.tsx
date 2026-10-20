@@ -10,7 +10,12 @@ import {
   Check,
   ChevronUp,
   ChevronDown,
+  ListOrdered,
+  Map as MapIcon,
+  Navigation,
 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CourierMap } from "@/components/courier-map";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
@@ -68,11 +73,24 @@ type RouteSummary = {
 
 const todayISO = () => new Date().toLocaleDateString("sv-SE");
 
+// rua, bairro e cidade numa linha só — é o que o mapa e o Waze procuram.
+// a cidade vem do ViaCEP como "Recife - PE"; o " - PE" atrapalha a busca
+const fullAddress = (s: {
+  delivery_address: string | null;
+  neighborhood: string | null;
+  city?: string | null;
+}) =>
+  [s.delivery_address, s.neighborhood, s.city?.replace(/\s*-\s*[A-Za-z]{2}$/, "")]
+    .map((p) => p?.trim())
+    .filter(Boolean)
+    .join(", ");
+
 function CourierPage() {
   const { user, isAdmin } = useAuth();
   const qc = useQueryClient();
 
   const [viewing, setViewing] = useState<string | null>(null);
+  const [tab, setTab] = useState<"list" | "map">("list");
 
   // admin acompanha a rota de qualquer entregador; entregador vê só a dele
   const courierId = isAdmin && viewing ? viewing : (user?.id ?? "");
@@ -360,22 +378,52 @@ function CourierPage() {
           </div>
         )}
 
-        {stops.length > 1 && (
-          <p className="text-center text-xs text-muted-foreground">
-            Use as setas para colocar as paradas na ordem do seu trajeto.
-          </p>
-        )}
+        {!done && (
+          <Tabs value={tab} onValueChange={(v) => setTab(v as "list" | "map")}>
+            <TabsList className="w-full">
+              <TabsTrigger value="list" className="flex-1">
+                <ListOrdered className="mr-1.5 size-4" /> Paradas
+              </TabsTrigger>
+              <TabsTrigger value="map" className="flex-1">
+                <MapIcon className="mr-1.5 size-4" /> Mapa
+              </TabsTrigger>
+            </TabsList>
 
-        {stops.map((s, idx) => (
-          <StopCard
-            key={s.id}
-            stop={s}
-            index={idx + 1}
-            onDone={refresh}
-            onUp={idx > 0 ? () => move(idx, -1) : undefined}
-            onDown={idx < stops.length - 1 ? () => move(idx, 1) : undefined}
-          />
-        ))}
+            <TabsContent value="list" className="mt-3 space-y-3">
+              {stops.length > 1 && (
+                <p className="text-center text-xs text-muted-foreground">
+                  Use as setas para colocar as paradas na ordem do seu trajeto.
+                </p>
+              )}
+
+              {stops.map((s, idx) => (
+                <StopCard
+                  key={s.id}
+                  stop={s}
+                  index={idx + 1}
+                  onDone={refresh}
+                  onUp={idx > 0 ? () => move(idx, -1) : undefined}
+                  onDown={idx < stops.length - 1 ? () => move(idx, 1) : undefined}
+                />
+              ))}
+            </TabsContent>
+
+            {/* só monta o mapa quando a aba abre: evita GPS e consultas de
+                endereço enquanto o entregador está só na lista */}
+            <TabsContent value="map" className="mt-3">
+              {tab === "map" && (
+                <CourierMap
+                  stops={stops.map((s, idx) => ({
+                    id: s.id,
+                    index: idx + 1,
+                    label: s.customers?.name ?? "Consumidor final",
+                    address: fullAddress(s),
+                  }))}
+                />
+              )}
+            </TabsContent>
+          </Tabs>
+        )}
 
         {openRoutes.map((r) => (
           <Button
@@ -408,6 +456,7 @@ type Stop = {
   payment_method: string;
   delivery_address: string | null;
   neighborhood: string | null;
+  city: string | null;
   notes: string | null;
   customers: { name: string; phone: string | null } | null;
 };
@@ -528,6 +577,17 @@ function StopCard({
 
       {stop.notes && (
         <p className="mt-2 rounded-md bg-muted px-3 py-2 text-sm">Obs.: {stop.notes}</p>
+      )}
+
+      {stop.delivery_address && (
+        <a
+          href={`https://waze.com/ul?q=${encodeURIComponent(fullAddress(stop))}&navigate=yes`}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-primary"
+        >
+          <Navigation className="size-4" /> Navegar até aqui
+        </a>
       )}
 
       <div className="mt-3 flex items-center justify-between">
