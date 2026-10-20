@@ -17,6 +17,7 @@ export type ReceiptSale = {
   delivery_notes: string | null;
   order_notes: string | null;
   customer_name: string | null;
+  customer_phone: string | null;
 };
 
 export type ReceiptItem = {
@@ -66,6 +67,12 @@ export const Receipt = forwardRef<
           <div className="flex justify-between gap-2">
             <span>Cliente</span>
             <span className="truncate text-right">{sale.customer_name}</span>
+          </div>
+        )}
+        {sale.customer_phone && (
+          <div className="flex justify-between gap-2">
+            <span>WhatsApp</span>
+            <span className="text-right">{sale.customer_phone}</span>
           </div>
         )}
         {sale.delivery_address && (

@@ -16,6 +16,7 @@ export type ReceiptCanvasSale = {
   delivery_notes: string | null;
   order_notes: string | null;
   customer_name: string | null;
+  customer_phone: string | null;
 };
 
 export type ReceiptCanvasItem = {
@@ -99,6 +100,7 @@ export function renderReceiptCanvas(
   let lines = 3; // título + subtítulo + divisor
   lines += 2; // pedido, data
   if (sale.customer_name) lines += 1;
+  if (sale.customer_phone) lines += 1;
   if (sale.delivery_address) lines += 2;
   lines += extra.length;
   if (notes.length) lines += notes.length + 1; // + respiro da caixa
@@ -166,6 +168,7 @@ export function renderReceiptCanvas(
     ctx.font = `12px ${FONT}`;
     row("Cliente", truncate(ctx, sale.customer_name, contentWidth * 0.55));
   }
+  if (sale.customer_phone) row("WhatsApp", sale.customer_phone);
   if (sale.delivery_address) {
     ctx.font = `12px ${FONT}`;
     ctx.textAlign = "left";

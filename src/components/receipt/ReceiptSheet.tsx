@@ -26,7 +26,7 @@ export function ReceiptSheet({ saleId, onClose }: { saleId: string | null; onClo
     queryFn: async () => {
       const { data, error } = await supabase
         .from("sales")
-        .select("*, customers(name, zip_code, reference_point, notes)")
+        .select("*, customers(name, phone, zip_code, reference_point, notes)")
         .eq("id", saleId!)
         .single();
       if (error) throw error;
@@ -70,6 +70,7 @@ export function ReceiptSheet({ saleId, onClose }: { saleId: string | null; onClo
       delivery_notes: sale.customers?.notes ?? null,
       order_notes: sale.notes ?? null,
       customer_name: sale.customers?.name ?? null,
+      customer_phone: sale.customers?.phone ?? null,
     };
   }, [sale]);
 
