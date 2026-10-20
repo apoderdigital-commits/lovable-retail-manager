@@ -1,7 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Camera, CalendarClock, XCircle, Flag, MapPin, Check } from "lucide-react";
+import {
+  Camera,
+  CalendarClock,
+  XCircle,
+  Flag,
+  MapPin,
+  Check,
+  ChevronUp,
+  ChevronDown,
+} from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
@@ -95,11 +104,47 @@ function CourierPage() {
         .select("*, customers(name, phone)")
         .eq("courier_id", courierId)
         .eq("status", "on_route")
+        // ordem escolhida pelo entregador; o que ele ainda não mexeu vai pro
+        // fim, do pedido mais antigo pro mais novo
+        .order("stop_order", { ascending: true, nullsFirst: false })
         .order("created_at");
       if (error) throw error;
       return data;
     },
   });
+
+  const reorder = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase.rpc("reorder_my_stops" as never, { p_sales: ids } as never);
+      if (error) throw error;
+    },
+    // a lista troca na hora; se o banco recusar, volta como estava
+    onMutate: async (ids) => {
+      const key = ["my-route", courierId];
+      await qc.cancelQueries({ queryKey: key });
+      const prev = qc.getQueryData<typeof stops>(key);
+      if (prev) {
+        qc.setQueryData(
+          key,
+          ids.map((id) => prev.find((s) => s.id === id)!).filter(Boolean),
+        );
+      }
+      return { prev, key };
+    },
+    onError: (e: Error, _ids, ctx) => {
+      if (ctx?.prev) qc.setQueryData(ctx.key, ctx.prev);
+      toast.error(e.message);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["my-route", courierId] }),
+  });
+
+  const move = (idx: number, delta: -1 | 1) => {
+    const ids = stops.map((s) => s.id);
+    const to = idx + delta;
+    if (to < 0 || to >= ids.length) return;
+    [ids[idx], ids[to]] = [ids[to], ids[idx]];
+    reorder.mutate(ids);
+  };
 
   // o banco já limita: entregador só recebe as próprias rotas, mesmo
   // que a chamada venha por fora da tela
@@ -315,8 +360,21 @@ function CourierPage() {
           </div>
         )}
 
+        {stops.length > 1 && (
+          <p className="text-center text-xs text-muted-foreground">
+            Use as setas para colocar as paradas na ordem do seu trajeto.
+          </p>
+        )}
+
         {stops.map((s, idx) => (
-          <StopCard key={s.id} stop={s} index={idx + 1} onDone={refresh} />
+          <StopCard
+            key={s.id}
+            stop={s}
+            index={idx + 1}
+            onDone={refresh}
+            onUp={idx > 0 ? () => move(idx, -1) : undefined}
+            onDown={idx < stops.length - 1 ? () => move(idx, 1) : undefined}
+          />
         ))}
 
         {openRoutes.map((r) => (
@@ -358,10 +416,14 @@ function StopCard({
   stop,
   index,
   onDone,
+  onUp,
+  onDown,
 }: {
   stop: Stop;
   index: number;
   onDone: () => void;
+  onUp?: () => void;
+  onDown?: () => void;
 }) {
   const { user } = useAuth();
   const [action, setAction] = useState<null | "deliver" | "schedule" | "fail">(null);
@@ -435,9 +497,33 @@ function StopCard({
             </span>
           </p>
         </div>
-        <Badge variant="secondary" className="shrink-0">
-          #{stop.sale_number}
-        </Badge>
+        <div className="flex shrink-0 items-center gap-1">
+          <Badge variant="secondary">#{stop.sale_number}</Badge>
+          {(onUp || onDown) && (
+            <div className="flex flex-col">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                disabled={!onUp}
+                onClick={onUp}
+                aria-label="Subir parada"
+              >
+                <ChevronUp className="size-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                disabled={!onDown}
+                onClick={onDown}
+                aria-label="Descer parada"
+              >
+                <ChevronDown className="size-4" />
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
 
       {stop.notes && (

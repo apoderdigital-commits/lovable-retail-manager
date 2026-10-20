@@ -576,6 +576,7 @@ export type Database = {
           scheduled_for: string | null
           seller_id: string | null
           status: Database["public"]["Enums"]["order_status"]
+          stop_order: number | null
           subtotal: number
           total: number
           updated_at: string
@@ -602,6 +603,7 @@ export type Database = {
           scheduled_for?: string | null
           seller_id?: string | null
           status?: Database["public"]["Enums"]["order_status"]
+          stop_order?: number | null
           subtotal?: number
           total?: number
           updated_at?: string
@@ -628,6 +630,7 @@ export type Database = {
           scheduled_for?: string | null
           seller_id?: string | null
           status?: Database["public"]["Enums"]["order_status"]
+          stop_order?: number | null
           subtotal?: number
           total?: number
           updated_at?: string
@@ -778,6 +781,7 @@ export type Database = {
           scheduled_for: string | null
           seller_id: string | null
           status: Database["public"]["Enums"]["order_status"]
+          stop_order: number | null
           subtotal: number
           total: number
           updated_at: string
@@ -934,6 +938,7 @@ export type Database = {
           scheduled_for: string | null
           seller_id: string | null
           status: Database["public"]["Enums"]["order_status"]
+          stop_order: number | null
           subtotal: number
           total: number
           updated_at: string
