@@ -12,7 +12,6 @@ import {
   ChevronDown,
   ListOrdered,
   Map as MapIcon,
-  Navigation,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CourierMap } from "@/components/courier-map";
@@ -73,7 +72,7 @@ type RouteSummary = {
 
 const todayISO = () => new Date().toLocaleDateString("sv-SE");
 
-// rua, bairro e cidade numa linha só — é o que o mapa e o Waze procuram.
+// rua, bairro e cidade numa linha só — é o que a busca do mapa procura.
 // a cidade vem do ViaCEP como "Recife - PE"; o " - PE" atrapalha a busca
 const fullAddress = (s: {
   delivery_address: string | null;
@@ -419,6 +418,7 @@ function CourierPage() {
                     label: s.customers?.name ?? "Consumidor final",
                     address: fullAddress(s),
                   }))}
+                  onOpenStops={() => setTab("list")}
                 />
               )}
             </TabsContent>
@@ -577,17 +577,6 @@ function StopCard({
 
       {stop.notes && (
         <p className="mt-2 rounded-md bg-muted px-3 py-2 text-sm">Obs.: {stop.notes}</p>
-      )}
-
-      {stop.delivery_address && (
-        <a
-          href={`https://waze.com/ul?q=${encodeURIComponent(fullAddress(stop))}&navigate=yes`}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-primary"
-        >
-          <Navigation className="size-4" /> Navegar até aqui
-        </a>
       )}
 
       <div className="mt-3 flex items-center justify-between">

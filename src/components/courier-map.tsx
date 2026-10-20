@@ -1,7 +1,7 @@
 import { useEffect, useState, type ComponentType } from "react";
 import type { MapStop } from "@/components/courier-map-impl";
 
-type Props = { stops: MapStop[] };
+type Props = { stops: MapStop[]; onOpenStops?: () => void };
 
 /**
  * Mesmo cuidado do mapa de rastreio: Leaflet usa `window` assim que é
@@ -23,7 +23,7 @@ export function CourierMap(props: Props) {
 
   if (!Impl) {
     return (
-      <div className="panel flex h-[60vh] min-h-80 items-center justify-center text-sm text-muted-foreground">
+      <div className="panel flex h-[65vh] min-h-80 items-center justify-center text-sm text-muted-foreground">
         Carregando mapa...
       </div>
     );
