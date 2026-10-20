@@ -28,6 +28,7 @@ import { brl } from "@/lib/format";
 import { ReceiptSheet } from "@/components/receipt/ReceiptSheet";
 import { PrintSettingsDialog } from "@/components/print-settings-dialog";
 import { MultiSelect } from "@/components/ui/multi-select";
+import { OrderDetail } from "@/components/order-detail";
 import type { Database } from "@/integrations/supabase/types";
 
 type Status = Database["public"]["Enums"]["order_status"];
@@ -69,6 +70,7 @@ function OrdersPage() {
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [pickingId, setPickingId] = useState<string | null>(null);
   const [printingId, setPrintingId] = useState<string | null>(null);
 
   const { data: orders = [], isLoading } = useQuery({
@@ -112,8 +114,6 @@ function OrdersPage() {
       .toLowerCase()
       .includes(term.toLowerCase());
   });
-
-  const detail = orders.find((o) => o.id === detailId) ?? null;
 
   return (
     <AppShell
@@ -195,7 +195,7 @@ function OrdersPage() {
                         variant="ghost"
                         size="sm"
                         disabled={transition.isPending}
-                        onClick={() => transition.mutate({ id: o.id, to: "picked" })}
+                        onClick={() => setPickingId(o.id)}
                       >
                         <PackageCheck className="mr-1.5 size-4" /> Separar
                       </Button>
@@ -267,103 +267,29 @@ function OrdersPage() {
         </DialogContent>
       </Dialog>
 
-      <OrderDetail sale={detail} onClose={() => setDetailId(null)} />
+      {/* "Separar" abre a ficha completa: quem separa confere itens, endereço,
+          WhatsApp e observações antes de confirmar */}
+      <OrderDetail
+        saleId={pickingId ?? detailId}
+        onClose={() => {
+          setPickingId(null);
+          setDetailId(null);
+        }}
+        action={
+          pickingId
+            ? {
+                label: "Confirmar separação",
+                pending: transition.isPending,
+                onClick: () =>
+                  transition.mutate(
+                    { id: pickingId, to: "picked" },
+                    { onSuccess: () => setPickingId(null) },
+                  ),
+              }
+            : undefined
+        }
+      />
       <ReceiptSheet saleId={printingId} onClose={() => setPrintingId(null)} />
     </AppShell>
-  );
-}
-
-function OrderDetail({
-  sale,
-  onClose,
-}: {
-  sale: {
-    id: string;
-    sale_number: number;
-    total: number;
-    reason: string | null;
-    notes: string | null;
-  } | null;
-  onClose: () => void;
-}) {
-  const { data: items = [] } = useQuery({
-    queryKey: ["order-items", sale?.id],
-    enabled: !!sale,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("sale_items")
-        .select("*")
-        .eq("sale_id", sale!.id);
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: history = [] } = useQuery({
-    queryKey: ["order-history", sale?.id],
-    enabled: !!sale,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("sale_status_history")
-        .select("*")
-        .eq("sale_id", sale!.id)
-        .order("created_at");
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  return (
-    <Dialog open={!!sale} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Pedido {sale?.sale_number}</DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-1">
-          {items.map((i) => (
-            <div key={i.id} className="flex justify-between text-sm">
-              <span>
-                {i.quantity}× {i.product_name}
-              </span>
-              <span className="text-muted-foreground">{brl(Number(i.total))}</span>
-            </div>
-          ))}
-          <div className="flex justify-between border-t border-border pt-1.5 text-sm font-medium">
-            <span>Total</span>
-            <span>{brl(Number(sale?.total ?? 0))}</span>
-          </div>
-        </div>
-
-        {sale?.notes && (
-          <p className="rounded-md bg-muted px-3 py-2 text-sm">Observação: {sale.notes}</p>
-        )}
-
-        {sale?.reason && (
-          <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
-            Motivo: {sale.reason}
-          </p>
-        )}
-
-        <div>
-          <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Histórico
-          </p>
-          <div className="space-y-1">
-            {history.map((h) => (
-              <div key={h.id} className="flex justify-between text-sm">
-                <span>
-                  {h.from_status ? `${STATUS[h.from_status].label} → ` : ""}
-                  {STATUS[h.to_status].label}
-                </span>
-                <span className="text-muted-foreground">
-                  {new Date(h.created_at).toLocaleString("pt-BR")}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
   );
 }

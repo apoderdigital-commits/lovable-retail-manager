@@ -10,7 +10,9 @@ import {
   Coins,
   Plus,
   Trash2,
+  Eye,
 } from "lucide-react";
+import { OrderDetail } from "@/components/order-detail";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
@@ -69,6 +71,7 @@ function DeliveriesPage() {
   const { isAdmin } = useAuth();
   const today = todayISO();
   const [closing, setClosing] = useState<string | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   const { data: couriers = [] } = useQuery({
     queryKey: ["couriers"],
@@ -284,6 +287,15 @@ function DeliveriesPage() {
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-sm font-medium">{o.customers?.name ?? "Consumidor final"}</p>
                   <div className="flex shrink-0 items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-6"
+                      onClick={() => setDetailId(o.id)}
+                      aria-label="Ver pedido"
+                    >
+                      <Eye className="size-3.5" />
+                    </Button>
                     <Badge variant="secondary" className="text-[10px]">
                       #{o.sale_number}
                     </Badge>
@@ -367,6 +379,15 @@ function DeliveriesPage() {
                       <Badge variant="secondary" className="shrink-0 text-[10px]">
                         #{o.sale_number}
                       </Badge>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-7"
+                        onClick={() => setDetailId(o.id)}
+                        aria-label="Ver pedido"
+                      >
+                        <Eye className="size-3.5" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -455,6 +476,10 @@ function DeliveriesPage() {
           })}
         </div>
       </div>
+
+      {/* ficha completa antes de despachar: itens, unidades, WhatsApp,
+          endereço com CEP e referência, observações */}
+      <OrderDetail saleId={detailId} onClose={() => setDetailId(null)} />
     </AppShell>
   );
 }
