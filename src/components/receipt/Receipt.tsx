@@ -83,12 +83,15 @@ export const Receipt = forwardRef<
               </p>
             )}
             {sale.reference_point && <p>Ref.: {sale.reference_point}</p>}
-            {sale.delivery_notes && <p>Obs. entrega: {sale.delivery_notes}</p>}
           </div>
         )}
-        {sale.order_notes && (
-          <div className="mt-1">
-            <p>Obs. pedido: {sale.order_notes}</p>
+        {/* observações numa caixa pontilhada pra não passarem despercebidas */}
+        {((sale.delivery_address && sale.delivery_notes) || sale.order_notes) && (
+          <div className="mt-2 space-y-0.5 border border-dashed border-black px-2 py-1.5">
+            {sale.delivery_address && sale.delivery_notes && (
+              <p>Obs. entrega: {sale.delivery_notes}</p>
+            )}
+            {sale.order_notes && <p>Obs. pedido: {sale.order_notes}</p>}
           </div>
         )}
 

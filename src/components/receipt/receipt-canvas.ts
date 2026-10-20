@@ -72,7 +72,8 @@ export function renderReceiptCanvas(
   // altura do canvas (o tamanho do canvas precisa ser definido antes de desenhar)
   const measure = document.createElement("canvas").getContext("2d");
   if (measure) measure.font = `12px ${FONT}`;
-  const wrapped = (t: string) => (measure ? wrap(measure, t, contentWidth) : [t]);
+  const wrapped = (t: string, width = contentWidth) =>
+    measure ? wrap(measure, t, width) : [t];
   const cityZip = [sale.city, sale.zip_code ? `CEP ${sale.zip_code}` : null]
     .filter(Boolean)
     .join(" - ");
@@ -80,16 +81,27 @@ export function renderReceiptCanvas(
     ? [
         ...(cityZip ? [cityZip] : []),
         ...(sale.reference_point ? wrapped(`Ref.: ${sale.reference_point}`) : []),
-        ...(sale.delivery_notes ? wrapped(`Obs. entrega: ${sale.delivery_notes}`) : []),
       ]
     : [];
-  if (sale.order_notes) extra.push(...wrapped(`Obs. pedido: ${sale.order_notes}`));
+
+  // observações vão numa caixa pontilhada: o texto fica recuado pra caber
+  // dentro da borda
+  const BOX_PAD = 6;
+  const notes: string[] = [
+    ...(sale.delivery_address && sale.delivery_notes
+      ? wrapped(`Obs. entrega: ${sale.delivery_notes}`, contentWidth - BOX_PAD * 2)
+      : []),
+    ...(sale.order_notes
+      ? wrapped(`Obs. pedido: ${sale.order_notes}`, contentWidth - BOX_PAD * 2)
+      : []),
+  ];
 
   let lines = 3; // título + subtítulo + divisor
   lines += 2; // pedido, data
   if (sale.customer_name) lines += 1;
   if (sale.delivery_address) lines += 2;
   lines += extra.length;
+  if (notes.length) lines += notes.length + 1; // + respiro da caixa
   lines += 1; // divisor
   lines += items.length * 2;
   lines += 1; // divisor
@@ -168,6 +180,22 @@ export function renderReceiptCanvas(
     ctx.textAlign = "left";
     ctx.fillText(line, left, y);
     y += LINE_H;
+  }
+  if (notes.length) {
+    const top = y + 4;
+    const boxH = notes.length * LINE_H + BOX_PAD;
+    ctx.strokeStyle = "#000000";
+    ctx.setLineDash([3, 3]);
+    ctx.strokeRect(left + 0.5, top + 0.5, contentWidth - 1, boxH);
+    ctx.setLineDash([]);
+    y = top + BOX_PAD / 2 + 1;
+    for (const line of notes) {
+      ctx.font = `12px ${FONT}`;
+      ctx.textAlign = "left";
+      ctx.fillText(line, left + BOX_PAD, y);
+      y += LINE_H;
+    }
+    y = top + boxH + 6;
   }
 
   divider();
