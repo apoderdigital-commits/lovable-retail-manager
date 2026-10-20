@@ -25,11 +25,11 @@ export type MapStop = {
 
 type Point = { lat: number; lng: number };
 
-// mapa limpo (CARTO Voyager): ruas e nomes de rua, sem relevo, trilhos,
-// ícones de comércio ou cores fortes como o mapa padrão do OpenStreetMap
-const TILES = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
-const ATTRIBUTION =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>';
+// mapa do OpenStreetMap, que não exige chave (o da CARTO passou a exigir e
+// cobria o mapa de "API KEY REQUIRED"). A classe map-clean, em styles.css,
+// tira as cores e suaviza o contraste: sobram ruas e nomes, sem poluição.
+const TILES = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -52,7 +52,13 @@ const fmtMin = (s: number) => `${Math.max(1, Math.round(s / 60))} min`;
 // política de uso: no máximo 1 consulta por segundo. O resultado fica
 // guardado no aparelho, então o mesmo endereço não é consultado de novo.
 
-const CACHE_KEY = "courier-geocode-v1";
+// v2: a v1 aceitava resultado fora da Grande Recife e pode ter guardado
+// endereço no lugar errado
+const CACHE_KEY = "courier-geocode-v2";
+
+// a loja só entrega na Grande Recife (Igarassu ao Cabo): a busca fica
+// presa nessa área, senão "Casa Caiada" ou "Centro" podem cair em outro estado
+const AREA = "viewbox=-35.35,-7.55,-34.80,-8.45&bounded=1";
 
 function readCache(): Record<string, Point | null> {
   try {
@@ -71,7 +77,7 @@ function writeCache(cache: Record<string, Point | null>) {
 }
 
 async function search(q: string): Promise<Point | null> {
-  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&q=${encodeURIComponent(q)}`;
+  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&${AREA}&q=${encodeURIComponent(q)}`;
   const res = await fetch(url, { headers: { "Accept-Language": "pt-BR" } });
   if (!res.ok) return null;
   const data = (await res.json()) as { lat: string; lon: string }[];
@@ -398,7 +404,7 @@ export function CourierMap({
           zoomControl={false}
           style={{ height: "100%", width: "100%", background: "#f2efe9" }}
         >
-          <TileLayer url={TILES} attribution={ATTRIBUTION} />
+          <TileLayer url={TILES} attribution={ATTRIBUTION} className="map-clean" maxZoom={19} />
           <QuietAttribution />
           {!navigating && <FitOnce points={[...(pos ? [pos] : []), ...located]} />}
           {navigating && <Follow pos={pos} follow={follow} onDrag={() => setFollow(false)} />}

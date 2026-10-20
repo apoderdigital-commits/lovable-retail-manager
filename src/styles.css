@@ -179,3 +179,8 @@
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-panel);
 }
+
+/* mapa do entregador: sem cores, contraste suave -- sobram ruas e nomes */
+.map-clean {
+  filter: grayscale(1) brightness(1.06) contrast(0.92);
+}
