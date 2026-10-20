@@ -78,6 +78,7 @@ function PdvPage() {
   const [discount, setDiscount] = useState("0");
   const [address, setAddress] = useState("");
   const [neighborhood, setNeighborhood] = useState("");
+  const [city, setCity] = useState("");
   const [notes, setNotes] = useState("");
   const [receiptSaleId, setReceiptSaleId] = useState<string | null>(null);
 
@@ -99,7 +100,7 @@ function PdvPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("customers")
-        .select("id, name, phone, document, customer_type, address, neighborhood")
+        .select("id, name, phone, document, customer_type, address, neighborhood, city")
         .order("name");
       if (error) throw error;
       return data;
@@ -153,6 +154,7 @@ function PdvPage() {
     const c = customers.find((x) => x.id === id);
     setAddress(c?.address ?? "");
     setNeighborhood(c?.neighborhood ?? "");
+    setCity(c?.city ?? "");
   };
 
   const filtered = useMemo(
@@ -184,7 +186,24 @@ function PdvPage() {
       : undefined;
   const base = matchedOffer ? Number(matchedOffer.price) : subtotal;
   const discountValue = Math.min(Number(discount || 0), base);
-  const total = base - discountValue;
+
+  // taxa de entrega: a cotação vem da mesma função que o banco usa ao criar
+  // o pedido, então a prévia não diverge do que vai ser cobrado
+  const { data: quote, isFetching: quoting } = useQuery({
+    queryKey: ["delivery-quote", city.trim(), neighborhood.trim()],
+    enabled: mode === "delivery" && !!city.trim(),
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("delivery_quote", {
+        p_city: city.trim(),
+        p_neighborhood: neighborhood.trim(),
+      });
+      if (error) throw error;
+      const z = data as { id: string | null; amount: number | null; serves: boolean | null } | null;
+      return z?.id ? z : null;
+    },
+  });
+  const deliveryFee = mode === "delivery" && quote?.serves ? Number(quote.amount ?? 0) : 0;
+  const total = base - discountValue + deliveryFee;
 
   const add = (p: (typeof products)[number]) => {
     const inCart = cart.find((i) => i.productId === p.id)?.quantity ?? 0;
@@ -226,6 +245,7 @@ function PdvPage() {
     setCustomerId("none");
     setAddress("");
     setNeighborhood("");
+    setCity("");
     setNotes("");
   };
 
@@ -235,12 +255,14 @@ function PdvPage() {
       // preço da tabela do cliente. o que está na tela é só prévia.
       const addr = counterSale ? "" : address.trim();
       const hood = counterSale ? "" : neighborhood.trim();
+      const town = counterSale ? "" : city.trim();
       const { data, error } = await supabase.rpc("create_order", {
         p_customer: (customerId === "none" ? null : customerId) as unknown as string,
         p_payment_method: payment,
         p_items: cart.map((i) => ({ product_id: i.productId, quantity: i.quantity })),
         ...(addr ? { p_address: addr } : {}),
         ...(hood ? { p_neighborhood: hood } : {}),
+        ...(town ? { p_city: town } : {}),
         ...(matchedOffer ? { p_offer: matchedOffer.id } : {}),
         p_is_traffic: origin === "traffic",
         p_discount: discountValue,
@@ -269,7 +291,11 @@ function PdvPage() {
 
   const missingCustomer = mode === "delivery" && customerId === "none";
   const missingAddress = mode === "delivery" && !address.trim();
-  const blocked = finish.isPending || cart.length === 0 || missingCustomer || missingAddress;
+  // sem cidade, cidade sem taxa cadastrada ou região que a loja não atende
+  const feeBlocked =
+    mode === "delivery" && (!city.trim() || quoting || !quote || !quote.serves);
+  const blocked =
+    finish.isPending || cart.length === 0 || missingCustomer || missingAddress || feeBlocked;
 
   return (
     <AppShell
@@ -510,14 +536,41 @@ function PdvPage() {
                   </Label>
                   <Input value={address} onChange={(e) => setAddress(e.target.value)} />
                 </div>
-                <div className="space-y-1.5 sm:col-span-2">
+                <div className="space-y-1.5">
                   <Label>Bairro</Label>
+                  <Input value={neighborhood} onChange={(e) => setNeighborhood(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>
+                    Cidade <span className="text-destructive">*</span>
+                  </Label>
                   <Input
-                    value={neighborhood}
-                    onChange={(e) => setNeighborhood(e.target.value)}
-                    placeholder="define a taxa do entregador"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    placeholder="Recife"
                   />
                 </div>
+                <p className="text-xs sm:col-span-2">
+                  {!city.trim() ? (
+                    <span className="text-muted-foreground">
+                      Informe a cidade para calcular a taxa de entrega.
+                    </span>
+                  ) : quoting ? (
+                    <span className="text-muted-foreground">Calculando taxa...</span>
+                  ) : !quote ? (
+                    <span className="text-destructive">
+                      Sem taxa cadastrada para essa cidade. Confira o nome ou cadastre em Entregas.
+                    </span>
+                  ) : !quote.serves ? (
+                    <span className="text-destructive">
+                      Não atendemos essa região ({neighborhood || city}).
+                    </span>
+                  ) : (
+                    <span className="text-success">
+                      Taxa de entrega: <strong>{brl(deliveryFee)}</strong>
+                    </span>
+                  )}
+                </p>
               </div>
             )}
 
@@ -573,6 +626,12 @@ function PdvPage() {
                 <span>Desconto</span>
                 <span>-{brl(discountValue)}</span>
               </div>
+              {mode === "delivery" && (
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Taxa de entrega</span>
+                  <span>{brl(deliveryFee)}</span>
+                </div>
+              )}
               <div className="mt-1 flex justify-between font-display text-lg font-semibold">
                 <span>Total</span>
                 <span>{brl(total)}</span>

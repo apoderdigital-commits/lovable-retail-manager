@@ -6,6 +6,7 @@ export type ReceiptCanvasSale = {
   payment_method: string;
   discount: number;
   subtotal: number;
+  delivery_fee: number;
   total: number;
   neighborhood: string | null;
   delivery_address: string | null;
@@ -54,6 +55,7 @@ export function renderReceiptCanvas(
   lines += 1; // divisor
   lines += 1; // subtotal
   if (sale.discount > 0) lines += 1;
+  if (sale.delivery_fee > 0) lines += 1;
   lines += 2; // total, pagamento
   lines += 1; // divisor
   lines += 1; // agradecimento
@@ -139,6 +141,7 @@ export function renderReceiptCanvas(
 
   row("Subtotal", brl(sale.subtotal));
   if (sale.discount > 0) row("Desconto", `-${brl(sale.discount)}`);
+  if (sale.delivery_fee > 0) row("Taxa de entrega", brl(sale.delivery_fee));
   row("Total", brl(sale.total), true);
   row("Pagamento", sale.payment_method);
 

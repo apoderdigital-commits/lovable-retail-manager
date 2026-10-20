@@ -7,6 +7,7 @@ export type ReceiptSale = {
   payment_method: string;
   discount: number;
   subtotal: number;
+  delivery_fee: number;
   total: number;
   neighborhood: string | null;
   delivery_address: string | null;
@@ -96,6 +97,12 @@ export const Receipt = forwardRef<
           <div className="flex justify-between">
             <span>Desconto</span>
             <span>-{brl(sale.discount)}</span>
+          </div>
+        )}
+        {sale.delivery_fee > 0 && (
+          <div className="flex justify-between">
+            <span>Taxa de entrega</span>
+            <span>{brl(sale.delivery_fee)}</span>
           </div>
         )}
         <div className="mt-1 flex justify-between text-sm font-bold">

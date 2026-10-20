@@ -46,13 +46,20 @@ export function ReceiptSheet({ saleId, onClose }: { saleId: string | null; onClo
 
   const receiptSale: ReceiptSale | null = useMemo(() => {
     if (!sale) return null;
+    const subtotal = Number(sale.subtotal);
+    const discount = Number(sale.discount);
+    const total = Number(sale.total);
     return {
       sale_number: sale.sale_number,
       created_at: sale.created_at,
       payment_method: sale.payment_method,
-      discount: Number(sale.discount),
-      subtotal: Number(sale.subtotal),
-      total: Number(sale.total),
+      discount,
+      subtotal,
+      // taxa cobrada do cliente = o que o total tem a mais que os produtos.
+      // pedido antigo guardava em delivery_fee só o pagamento do entregador,
+      // sem somar no total — por isso não dá pra ler a coluna direto
+      delivery_fee: Math.max(0, Math.round((total - Math.max(subtotal - discount, 0)) * 100) / 100),
+      total,
       neighborhood: sale.neighborhood,
       delivery_address: sale.delivery_address,
       customer_name: sale.customers?.name ?? null,

@@ -434,6 +434,33 @@ export type Database = {
         }
         Relationships: []
       }
+      delivery_zones: {
+        Row: {
+          amount: number | null
+          city: string
+          created_at: string
+          id: string
+          neighborhood: string | null
+          serves: boolean
+        }
+        Insert: {
+          amount?: number | null
+          city: string
+          created_at?: string
+          id?: string
+          neighborhood?: string | null
+          serves?: boolean
+        }
+        Update: {
+          amount?: number | null
+          city?: string
+          created_at?: string
+          id?: string
+          neighborhood?: string | null
+          serves?: boolean
+        }
+        Relationships: []
+      }
       sale_items: {
         Row: {
           created_at: string
@@ -533,6 +560,7 @@ export type Database = {
           discount: number
           fee_due: boolean
           id: string
+          city: string | null
           is_traffic: boolean
           neighborhood: string | null
           notes: string | null
@@ -558,6 +586,7 @@ export type Database = {
           discount?: number
           fee_due?: boolean
           id?: string
+          city?: string | null
           is_traffic?: boolean
           neighborhood?: string | null
           notes?: string | null
@@ -583,6 +612,7 @@ export type Database = {
           discount?: number
           fee_due?: boolean
           id?: string
+          city?: string | null
           is_traffic?: boolean
           neighborhood?: string | null
           notes?: string | null
@@ -698,9 +728,21 @@ export type Database = {
     }
     Functions: {
       close_route: { Args: { p_route: string }; Returns: Json }
+      delivery_quote: {
+        Args: { p_city: string; p_neighborhood: string }
+        Returns: {
+          amount: number | null
+          city: string
+          created_at: string
+          id: string
+          neighborhood: string | null
+          serves: boolean
+        }
+      }
       create_order: {
         Args: {
           p_address?: string
+          p_city?: string
           p_counter_sale?: boolean
           p_customer: string
           p_discount?: number
@@ -720,6 +762,7 @@ export type Database = {
           discount: number
           fee_due: boolean
           id: string
+          city: string | null
           is_traffic: boolean
           neighborhood: string | null
           notes: string | null
@@ -875,6 +918,7 @@ export type Database = {
           discount: number
           fee_due: boolean
           id: string
+          city: string | null
           is_traffic: boolean
           neighborhood: string | null
           notes: string | null
