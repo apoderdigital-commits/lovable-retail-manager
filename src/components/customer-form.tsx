@@ -109,8 +109,11 @@ export function CustomerFormFields({
         toast.error("CEP não encontrado");
         return;
       }
+      // o form aqui é o de antes da colagem (CEP ainda vazio): sem repor o
+      // CEP, preencher o endereço apagava o número que acabou de ser colado
       onChange({
         ...form,
+        zip_code: `${cep.slice(0, 5)}-${cep.slice(5)}`,
         address: data.logradouro || form.address,
         neighborhood: data.bairro || form.neighborhood,
         city: data.localidade ? `${data.localidade}${data.uf ? ` - ${data.uf}` : ""}` : form.city,
