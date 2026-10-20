@@ -17,7 +17,7 @@ export const Route = createFileRoute("/configuracoes")({
   head: () => ({
     meta: [
       { title: "Configurações — Vieira Perfumes" },
-      { name: "description", content: "Integração com o Meta Ads e vínculo entre ofertas e campanhas." },
+      { name: "description", content: "Integração com o Meta Ads e campanhas acompanhadas." },
     ],
   }),
   component: SettingsPage,
@@ -110,15 +110,6 @@ function SettingsPage() {
     },
   });
 
-  const { data: links = [] } = useQuery({
-    queryKey: ["offer-campaigns"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("offer_campaigns").select("*");
-      if (error) throw error;
-      return data;
-    },
-  });
-
   const save = useMutation({
     mutationFn: async () => {
       if (!token.trim() && !status?.configured) throw new Error("Cole o token");
@@ -166,32 +157,18 @@ function SettingsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const toggleLink = useMutation({
-    mutationFn: async ({
-      offerId,
-      campaignId,
-      on,
-    }: {
-      offerId: string;
-      campaignId: string;
-      on: boolean;
-    }) => {
-      if (on) {
-        const { error } = await supabase
-          .from("offer_campaigns")
-          .insert({ offer_id: offerId, campaign_id: campaignId });
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from("offer_campaigns")
-          .delete()
-          .eq("offer_id", offerId)
-          .eq("campaign_id", campaignId);
-        if (error) throw error;
-      }
+  // a oferta de cada venda já sai da quantidade x valor no PDV; aqui só
+  // se escolhe quais campanhas entram na conta de Marketing
+  const toggleTracked = useMutation({
+    mutationFn: async ({ campaignId, on }: { campaignId: string; on: boolean }) => {
+      const { error } = await supabase
+        .from("ad_campaigns")
+        .update({ tracked: on })
+        .eq("id", campaignId);
+      if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["offer-campaigns"] });
+      qc.invalidateQueries({ queryKey: ["ad-campaigns"] });
       qc.invalidateQueries({ queryKey: ["marketing"] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -239,9 +216,6 @@ function SettingsPage() {
       </AppShell>
     );
   }
-
-  const linkedTo = (offerId: string) =>
-    links.filter((l) => l.offer_id === offerId).map((l) => l.campaign_id);
 
   return (
     <AppShell title="Configurações" subtitle="Integrações e vínculos">
@@ -308,7 +282,12 @@ function SettingsPage() {
         <section className="panel p-4">
           <div className="mb-3 flex items-center gap-2">
             <Link2 className="size-4 text-muted-foreground" />
-            <h2 className="text-sm font-semibold">Ofertas e campanhas</h2>
+            <h2 className="text-sm font-semibold">Campanhas acompanhadas</h2>
+            {campaigns.length > 0 && (
+              <span className="ml-auto text-xs text-muted-foreground">
+                {campaigns.filter((c) => c.tracked).length} de {campaigns.length}
+              </span>
+            )}
           </div>
 
           {campaigns.length === 0 ? (
@@ -316,42 +295,26 @@ function SettingsPage() {
               Nenhuma campanha ainda. Salve as credenciais e sincronize para trazer a lista do Meta.
             </p>
           ) : (
-            <div className="space-y-4">
-              {offers.map((o) => {
-                const linked = linkedTo(o.id);
-                return (
-                  <div key={o.id}>
-                    <p className="mb-1.5 text-sm font-medium">{o.name}</p>
-                    <div className="space-y-1">
-                      {campaigns.map((c) => {
-                        const on = linked.includes(c.id);
-                        return (
-                          <label
-                            key={c.id}
-                            className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={on}
-                              onChange={() =>
-                                toggleLink.mutate({
-                                  offerId: o.id,
-                                  campaignId: c.id,
-                                  on: !on,
-                                })
-                              }
-                            />
-                            <span className="min-w-0 flex-1 truncate">{c.name}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="space-y-3">
+              <div className="space-y-1">
+                {campaigns.map((c) => (
+                  <label
+                    key={c.id}
+                    className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={c.tracked}
+                      disabled={toggleTracked.isPending}
+                      onChange={() => toggleTracked.mutate({ campaignId: c.id, on: !c.tracked })}
+                    />
+                    <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                  </label>
+                ))}
+              </div>
               <p className="text-xs text-muted-foreground">
-                O gasto de cada campanha marcada entra no resultado daquela oferta. Campanha sem
-                vínculo não aparece em Marketing.
+                O gasto das campanhas marcadas entra em Marketing. A oferta de cada venda é
+                reconhecida sozinha pela quantidade e valor no PDV.
               </p>
             </div>
           )}

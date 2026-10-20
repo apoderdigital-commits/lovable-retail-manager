@@ -20,18 +20,21 @@ export type Database = {
           name: string
           status: string | null
           synced_at: string
+          tracked: boolean
         }
         Insert: {
           id: string
           name: string
           status?: string | null
           synced_at?: string
+          tracked?: boolean
         }
         Update: {
           id?: string
           name?: string
           status?: string | null
           synced_at?: string
+          tracked?: boolean
         }
         Relationships: []
       }

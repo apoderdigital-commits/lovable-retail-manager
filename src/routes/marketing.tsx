@@ -31,12 +31,28 @@ export const Route = createFileRoute("/marketing")({
   component: MarketingPage,
 });
 
+// gasto e conversas por oferta não são usados: campanha não é mais
+// amarrada a oferta — ver campaign_performance
 type Row = {
   offer_id: string;
   offer_name: string;
+  sales_count: number;
+  revenue: number;
+  customers: number;
+};
+
+type CampaignRow = {
+  campaign_id: string;
+  campaign_name: string;
   spend: number;
-  conversations: number;
+  impressions: number;
   clicks: number;
+  conversations: number;
+};
+
+type OrganicOffer = {
+  offer_id: string;
+  offer_name: string;
   sales_count: number;
   revenue: number;
   customers: number;
@@ -109,7 +125,7 @@ function MarketingPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const { data: rows = [], isLoading } = useQuery({
+  const { data: rows = [] } = useQuery({
     queryKey: ["marketing", "offers", from, to],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("offer_performance", {
@@ -118,6 +134,31 @@ function MarketingPage() {
       });
       if (error) throw error;
       return (data ?? []) as Row[];
+    },
+  });
+
+  // gasto vem só das campanhas marcadas em Configurações
+  const { data: campaigns = [], isLoading: loadingCampaigns } = useQuery({
+    queryKey: ["marketing", "campaigns", from, to],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("campaign_performance" as never, {
+        p_from: from,
+        p_to: to,
+      } as never);
+      if (error) throw error;
+      return (data ?? []) as CampaignRow[];
+    },
+  });
+
+  const { data: organicOffers = [] } = useQuery({
+    queryKey: ["marketing", "organic-offers", from, to],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("organic_offer_match" as never, {
+        p_from: from,
+        p_to: to,
+      } as never);
+      if (error) throw error;
+      return (data ?? []) as OrganicOffer[];
     },
   });
 
@@ -156,16 +197,19 @@ function MarketingPage() {
     },
   });
 
-  const spend = rows.reduce((s, r) => s + Number(r.spend), 0);
-  const revenue = rows.reduce((s, r) => s + Number(r.revenue), 0);
-  const sales = rows.reduce((s, r) => s + Number(r.sales_count), 0);
+  const spend = campaigns.reduce((s, c) => s + Number(c.spend), 0);
+  const conversations = campaigns.reduce((s, c) => s + Number(c.conversations), 0);
   const organicSales = Number(organic?.sales_count ?? 0);
   const organicRevenue = Number(organic?.revenue ?? 0);
   const looseSales = Number(trafficLoose?.sales_count ?? 0);
   const looseRevenue = Number(trafficLoose?.revenue ?? 0);
+  // tráfego inteiro = kits que vieram de anúncio + avulso de anúncio
+  const revenue = rows.reduce((s, r) => s + Number(r.revenue), 0) + looseRevenue;
+  const sales = rows.reduce((s, r) => s + Number(r.sales_count), 0) + looseSales;
+  const organicOf = (offerId: string) => organicOffers.find((o) => o.offer_id === offerId);
 
   return (
-    <AppShell title="Marketing" subtitle="Campanhas cruzadas com as vendas de cada oferta">
+    <AppShell title="Marketing" subtitle="Gasto das campanhas acompanhadas cruzado com as vendas">
       <div className="mb-4 flex flex-wrap items-end gap-3">
         <div className="space-y-1.5">
           <Label className="text-xs">De</Label>
@@ -187,7 +231,7 @@ function MarketingPage() {
 
       <div className="mb-4 grid gap-4 lg:grid-cols-3">
         <div className="rounded-xl border border-border p-4">
-          <h2 className="mb-3 text-sm font-semibold">Tráfego · oferta</h2>
+          <h2 className="mb-3 text-sm font-semibold">Tráfego · total</h2>
           <div className="grid grid-cols-2 gap-3">
             <Tile label="Investido" value={brl(spend)} />
             <Tile label="Faturamento" value={brl(revenue)} />
@@ -237,46 +281,45 @@ function MarketingPage() {
       <div className="panel mb-4 overflow-x-auto">
         <div className="flex items-center gap-2 border-b border-border px-4 py-3">
           <TrendingUp className="size-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold">Por oferta</h2>
+          <h2 className="text-sm font-semibold">Por campanha</h2>
+          <span className="ml-auto text-xs text-muted-foreground">
+            {conversations} conversa(s) · conversão {show(per(sales, conversations), pct)}
+          </span>
         </div>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Oferta</TableHead>
+              <TableHead>Campanha</TableHead>
               <TableHead className="text-right">Gasto</TableHead>
+              <TableHead className="text-right">Impressões</TableHead>
+              <TableHead className="text-right">Cliques</TableHead>
               <TableHead className="text-right">Conversas</TableHead>
-              <TableHead className="text-right">Vendas</TableHead>
-              <TableHead className="text-right">Conversão</TableHead>
-              <TableHead className="text-right">CPV</TableHead>
-              <TableHead className="text-right">Faturamento</TableHead>
-              <TableHead className="text-right">ROAS</TableHead>
+              <TableHead className="text-right">Custo por conversa</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map((r) => (
-              <TableRow key={r.offer_id}>
-                <TableCell className="font-medium">{r.offer_name}</TableCell>
-                <TableCell className="text-right">{brl(Number(r.spend))}</TableCell>
+            {campaigns.map((c) => (
+              <TableRow key={c.campaign_id}>
+                <TableCell className="max-w-72 truncate font-medium" title={c.campaign_name}>
+                  {c.campaign_name}
+                </TableCell>
+                <TableCell className="text-right">{brl(Number(c.spend))}</TableCell>
                 <TableCell className="text-right text-muted-foreground">
-                  {r.conversations || "—"}
+                  {Number(c.impressions).toLocaleString("pt-BR")}
                 </TableCell>
-                <TableCell className="text-right">{r.sales_count}</TableCell>
+                <TableCell className="text-right text-muted-foreground">
+                  {Number(c.clicks).toLocaleString("pt-BR")}
+                </TableCell>
+                <TableCell className="text-right">{c.conversations || "—"}</TableCell>
                 <TableCell className="text-right">
-                  {show(per(Number(r.sales_count), Number(r.conversations)), pct)}
-                </TableCell>
-                <TableCell className="text-right">
-                  {show(per(Number(r.spend), Number(r.sales_count)), brl)}
-                </TableCell>
-                <TableCell className="text-right font-medium">{brl(Number(r.revenue))}</TableCell>
-                <TableCell className="text-right font-medium">
-                  {show(per(Number(r.revenue), Number(r.spend)), mult)}
+                  {show(per(Number(c.spend), Number(c.conversations)), brl)}
                 </TableCell>
               </TableRow>
             ))}
-            {rows.length === 0 && !isLoading && (
+            {campaigns.length === 0 && !loadingCampaigns && (
               <TableRow>
-                <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
-                  Nenhuma oferta ativa.
+                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                  Nenhuma campanha acompanhada. Marque as campanhas em Configurações.
                 </TableCell>
               </TableRow>
             )}
@@ -302,15 +345,27 @@ function MarketingPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map((r) => (
-              <TableRow key={`${r.offer_id}-trafego`}>
-                <TableCell className="font-medium">{r.offer_name}</TableCell>
-                <TableCell className="text-muted-foreground">Tráfego</TableCell>
-                <TableCell className="text-right">{r.sales_count}</TableCell>
-                <TableCell className="text-right">{r.customers}</TableCell>
-                <TableCell className="text-right font-medium">{brl(Number(r.revenue))}</TableCell>
-              </TableRow>
-            ))}
+            {rows.flatMap((r) => {
+              const org = organicOf(r.offer_id);
+              return [
+                <TableRow key={`${r.offer_id}-trafego`}>
+                  <TableCell className="font-medium">{r.offer_name}</TableCell>
+                  <TableCell className="text-muted-foreground">Tráfego</TableCell>
+                  <TableCell className="text-right">{r.sales_count}</TableCell>
+                  <TableCell className="text-right">{r.customers}</TableCell>
+                  <TableCell className="text-right font-medium">{brl(Number(r.revenue))}</TableCell>
+                </TableRow>,
+                <TableRow key={`${r.offer_id}-organico`}>
+                  <TableCell className="font-medium">{r.offer_name}</TableCell>
+                  <TableCell className="text-muted-foreground">Orgânico</TableCell>
+                  <TableCell className="text-right">{org?.sales_count ?? 0}</TableCell>
+                  <TableCell className="text-right">{org?.customers ?? 0}</TableCell>
+                  <TableCell className="text-right font-medium">
+                    {brl(Number(org?.revenue ?? 0))}
+                  </TableCell>
+                </TableRow>,
+              ];
+            })}
             <TableRow className="bg-muted/40">
               <TableCell className="font-medium text-muted-foreground">Avulso (sem kit)</TableCell>
               <TableCell className="text-muted-foreground">Tráfego</TableCell>
@@ -319,7 +374,7 @@ function MarketingPage() {
               <TableCell className="text-right font-medium">{brl(looseRevenue)}</TableCell>
             </TableRow>
             <TableRow className="bg-muted/40">
-              <TableCell className="font-medium text-muted-foreground">—</TableCell>
+              <TableCell className="font-medium text-muted-foreground">Total</TableCell>
               <TableCell className="text-muted-foreground">
                 <span className="flex items-center gap-1.5">
                   <Sprout className="size-3.5" /> Orgânico
