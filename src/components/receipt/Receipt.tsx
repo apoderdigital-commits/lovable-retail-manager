@@ -109,6 +109,10 @@ export const Receipt = forwardRef<
         <div className="my-2 border-t border-dashed border-black" />
 
         <div className="flex justify-between">
+          <span>Total de unidades</span>
+          <span>{items.reduce((s, i) => s + i.quantity, 0)}</span>
+        </div>
+        <div className="flex justify-between">
           <span>Subtotal</span>
           <span>{brl(sale.subtotal)}</span>
         </div>

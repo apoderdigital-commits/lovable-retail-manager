@@ -93,7 +93,7 @@ export function renderReceiptCanvas(
   lines += 1; // divisor
   lines += items.length * 2;
   lines += 1; // divisor
-  lines += 1; // subtotal
+  lines += 2; // total de unidades, subtotal
   if (sale.discount > 0) lines += 1;
   if (sale.delivery_fee > 0) lines += 1;
   lines += 2; // total, pagamento
@@ -185,6 +185,7 @@ export function renderReceiptCanvas(
 
   divider();
 
+  row("Total de unidades", String(items.reduce((s, i) => s + i.quantity, 0)));
   row("Subtotal", brl(sale.subtotal));
   if (sale.discount > 0) row("Desconto", `-${brl(sale.discount)}`);
   if (sale.delivery_fee > 0) row("Taxa de entrega", brl(sale.delivery_fee));
