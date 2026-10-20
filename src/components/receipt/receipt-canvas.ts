@@ -10,6 +10,11 @@ export type ReceiptCanvasSale = {
   total: number;
   neighborhood: string | null;
   delivery_address: string | null;
+  city: string | null;
+  zip_code: string | null;
+  reference_point: string | null;
+  delivery_notes: string | null;
+  order_notes: string | null;
   customer_name: string | null;
 };
 
@@ -25,6 +30,23 @@ const SCALE = 2;
 const FONT = "monospace";
 const LINE_H = 16;
 const PAD = 16;
+
+// quebra o texto em linhas que cabem na largura — observação costuma ser
+// maior que uma linha de bobina e não pode ser cortada como o nome do item
+function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number) {
+  const lines: string[] = [];
+  let cur = "";
+  for (const word of text.replace(/\s+/g, " ").trim().split(" ")) {
+    const next = cur ? `${cur} ${word}` : word;
+    if (ctx.measureText(next).width <= maxWidth || !cur) cur = next;
+    else {
+      lines.push(cur);
+      cur = word;
+    }
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
 
 function truncate(ctx: CanvasRenderingContext2D, text: string, maxWidth: number) {
   if (ctx.measureText(text).width <= maxWidth) return text;
@@ -46,10 +68,28 @@ export function renderReceiptCanvas(
 ): HTMLCanvasElement {
   const contentWidth = widthPx - PAD * 2;
 
+  // linhas extras de entrega e observações, quebradas antes de medir a
+  // altura do canvas (o tamanho do canvas precisa ser definido antes de desenhar)
+  const measure = document.createElement("canvas").getContext("2d");
+  if (measure) measure.font = `12px ${FONT}`;
+  const wrapped = (t: string) => (measure ? wrap(measure, t, contentWidth) : [t]);
+  const cityZip = [sale.city, sale.zip_code ? `CEP ${sale.zip_code}` : null]
+    .filter(Boolean)
+    .join(" - ");
+  const extra: string[] = sale.delivery_address
+    ? [
+        ...(cityZip ? [cityZip] : []),
+        ...(sale.reference_point ? wrapped(`Ref.: ${sale.reference_point}`) : []),
+        ...(sale.delivery_notes ? wrapped(`Obs. entrega: ${sale.delivery_notes}`) : []),
+      ]
+    : [];
+  if (sale.order_notes) extra.push(...wrapped(`Obs. pedido: ${sale.order_notes}`));
+
   let lines = 3; // título + subtítulo + divisor
   lines += 2; // pedido, data
   if (sale.customer_name) lines += 1;
   if (sale.delivery_address) lines += 2;
+  lines += extra.length;
   lines += 1; // divisor
   lines += items.length * 2;
   lines += 1; // divisor
@@ -121,6 +161,12 @@ export function renderReceiptCanvas(
     y += LINE_H;
     const addr = `${sale.delivery_address}${sale.neighborhood ? ` - ${sale.neighborhood}` : ""}`;
     ctx.fillText(truncate(ctx, addr, contentWidth), left, y);
+    y += LINE_H;
+  }
+  for (const line of extra) {
+    ctx.font = `12px ${FONT}`;
+    ctx.textAlign = "left";
+    ctx.fillText(line, left, y);
     y += LINE_H;
   }
 

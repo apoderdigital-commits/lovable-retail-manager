@@ -26,7 +26,7 @@ export function ReceiptSheet({ saleId, onClose }: { saleId: string | null; onClo
     queryFn: async () => {
       const { data, error } = await supabase
         .from("sales")
-        .select("*, customers(name)")
+        .select("*, customers(name, zip_code, reference_point, notes)")
         .eq("id", saleId!)
         .single();
       if (error) throw error;
@@ -62,6 +62,13 @@ export function ReceiptSheet({ saleId, onClose }: { saleId: string | null; onClo
       total,
       neighborhood: sale.neighborhood,
       delivery_address: sale.delivery_address,
+      city: sale.city ?? null,
+      // CEP, referência e observação de entrega vêm do cadastro do cliente;
+      // a observação do pedido é a digitada no PDV
+      zip_code: sale.customers?.zip_code ?? null,
+      reference_point: sale.customers?.reference_point ?? null,
+      delivery_notes: sale.customers?.notes ?? null,
+      order_notes: sale.notes ?? null,
       customer_name: sale.customers?.name ?? null,
     };
   }, [sale]);

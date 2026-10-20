@@ -11,6 +11,11 @@ export type ReceiptSale = {
   total: number;
   neighborhood: string | null;
   delivery_address: string | null;
+  city: string | null;
+  zip_code: string | null;
+  reference_point: string | null;
+  delivery_notes: string | null;
+  order_notes: string | null;
   customer_name: string | null;
 };
 
@@ -70,6 +75,20 @@ export const Receipt = forwardRef<
               {sale.delivery_address}
               {sale.neighborhood ? ` - ${sale.neighborhood}` : ""}
             </p>
+            {(sale.city || sale.zip_code) && (
+              <p>
+                {sale.city ?? ""}
+                {sale.city && sale.zip_code ? " - " : ""}
+                {sale.zip_code ? `CEP ${sale.zip_code}` : ""}
+              </p>
+            )}
+            {sale.reference_point && <p>Ref.: {sale.reference_point}</p>}
+            {sale.delivery_notes && <p>Obs. entrega: {sale.delivery_notes}</p>}
+          </div>
+        )}
+        {sale.order_notes && (
+          <div className="mt-1">
+            <p>Obs. pedido: {sale.order_notes}</p>
           </div>
         )}
 
