@@ -37,9 +37,10 @@ const nav = [
   { to: "/produtos", label: "Produtos", icon: Package, access: "staff" },
   { to: "/clientes", label: "Clientes", icon: Users, access: "staff" },
   { to: "/crm", label: "CRM", icon: Contact, access: "staff" },
-  { to: "/relatorios", label: "Relatórios", icon: BarChart3, access: "staff" },
-  { to: "/marketing", label: "Marketing", icon: Megaphone, access: "staff" },
-  { to: "/financeiro", label: "Financeiro", icon: Wallet, access: "staff" },
+  // números da loja: só admin (vendedor não vê faturamento, gasto nem lucro)
+  { to: "/relatorios", label: "Relatórios", icon: BarChart3, access: "admin" },
+  { to: "/marketing", label: "Marketing", icon: Megaphone, access: "admin" },
+  { to: "/financeiro", label: "Financeiro", icon: Wallet, access: "admin" },
   { to: "/usuarios", label: "Usuários", icon: ShieldCheck, access: "admin" },
   { to: "/configuracoes", label: "Configurações", icon: Settings, access: "admin" },
 ] as const;
@@ -126,9 +127,25 @@ export function AppShell({
     );
   }
 
-  const visible = nav.filter((i) =>
-    i.access === "admin" ? isAdmin : i.access === "staff" ? isStaff : isCourier || isAdmin,
-  );
+  const allowed = (i: (typeof nav)[number]) =>
+    i.access === "admin" ? isAdmin : i.access === "staff" ? isStaff : isCourier || isAdmin;
+  const visible = nav.filter(allowed);
+
+  // esconder do menu não basta: quem digitar o endereço também não entra
+  const current = nav.find((i) => i.to === pathname);
+  if (current && !allowed(current)) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 px-6 text-center">
+        <p className="font-display text-lg font-semibold">Área restrita</p>
+        <p className="max-w-sm text-sm text-muted-foreground">
+          Seu acesso não inclui esta tela. Fale com um administrador se precisar dela.
+        </p>
+        <Button variant="outline" size="sm" asChild>
+          <Link to="/">Voltar ao painel</Link>
+        </Button>
+      </div>
+    );
+  }
 
   const logout = async () => {
     await signOut();
