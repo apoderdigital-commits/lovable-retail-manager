@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, TileLayer, Marker, Polyline, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { keepAwakeOn, keepAwakeOff } from "@/lib/keep-awake";
 import {
   ArrowUp,
   ArrowLeft,
@@ -179,26 +180,6 @@ function useMyPosition() {
   return { pos, heading, denied };
 }
 
-// tela não apaga enquanto o entregador estiver navegando
-function useWakeLock(on: boolean) {
-  useEffect(() => {
-    if (!on || !("wakeLock" in navigator)) return;
-    let lock: { release: () => Promise<void> } | null = null;
-    (navigator as unknown as { wakeLock: { request: (t: "screen") => Promise<typeof lock> } }).wakeLock
-      .request("screen")
-      .then((l) => {
-        lock = l;
-      })
-      .catch(() => {
-        // navegador recusou: só segue sem manter a tela acesa
-      });
-    return () => {
-      lock?.release().catch(() => {});
-    };
-  }, [on]);
-}
-
-
 // ---- rota pelas ruas (OSRM, servidor público do OpenStreetMap) ----
 
 type Step = {
@@ -253,10 +234,11 @@ function instruction(step: Step | undefined): { text: string; icon: typeof Arrow
 
 // ---- ícones ----
 
-const stopIcon = (n: number, active: boolean) =>
+// o número gira ao contrário do mapa pra continuar de pé na tela
+const stopIcon = (n: number, active: boolean, mapRotation = 0) =>
   L.divIcon({
     className: "",
-    html: `<div style="width:${active ? 32 : 26}px;height:${active ? 32 : 26}px;border-radius:50%;background:${active ? "#16a34a" : "#1e3a52"};color:white;font:600 13px sans-serif;display:grid;place-items:center;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.35)">${n}</div>`,
+    html: `<div style="width:${active ? 32 : 26}px;height:${active ? 32 : 26}px;border-radius:50%;background:${active ? "#16a34a" : "#1e3a52"};color:white;font:600 13px sans-serif;display:grid;place-items:center;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.35);transform:rotate(${mapRotation}deg)">${n}</div>`,
     iconSize: [active ? 32 : 26, active ? 32 : 26],
     iconAnchor: [active ? 16 : 13, active ? 16 : 13],
   });
@@ -306,6 +288,16 @@ function Follow({ pos, follow, onDrag }: { pos: Point | null; follow: boolean; o
 }
 
 
+// a camada do mapa muda de tamanho ao entrar/sair da navegação girada:
+// o Leaflet precisa recalcular, senão sobram áreas cinzas sem rua
+function ResizeSync({ dep }: { dep: string }) {
+  const map = useMap();
+  useEffect(() => {
+    map.invalidateSize({ pan: false });
+  }, [map, dep]);
+  return null;
+}
+
 // o crédito do mapa é exigido pela licença, mas sem o selo do Leaflet
 function QuietAttribution() {
   const map = useMap();
@@ -329,7 +321,33 @@ export function CourierMap({
   const { pos, heading, denied } = useMyPosition();
   const [navigating, setNavigating] = useState(false);
   const [follow, setFollow] = useState(true);
-  useWakeLock(navigating);
+
+  // sai da tela do mapa (troca de aba, entrega confirmada): libera a tela
+  useEffect(() => () => keepAwakeOff(), []);
+
+  // ângulo do mapa "desenrolado": de 350° pra 10° gira 20°, não volta 340°
+  // pelo caminho longo
+  const rotation = useRef(0);
+  const rot = useMemo(() => {
+    const delta = ((heading - (rotation.current % 360) + 540) % 360) - 180;
+    rotation.current += delta;
+    return rotation.current;
+  }, [heading]);
+
+  // lado do quadrado que cobre a moldura em qualquer ângulo (a diagonal)
+  const frame = useRef<HTMLDivElement>(null);
+  const [diag, setDiag] = useState(0);
+  useEffect(() => {
+    const el = frame.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => {
+      const { width, height } = e!.contentRect;
+      setDiag(Math.ceil(Math.hypot(width, height)));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const rotating = navigating && follow && diag > 0;
 
   const located = useMemo(
     () =>
@@ -390,14 +408,38 @@ export function CourierMap({
   const instr = instruction(nextStep);
   const InstrIcon = arrived ? Flag : instr.icon;
 
+  // dentro do clique: o iOS só deixa manter a tela acesa a partir de um toque
   const start = () => {
+    keepAwakeOn();
     setFollow(true);
     setNavigating(true);
+  };
+  const stop = () => {
+    keepAwakeOff();
+    setNavigating(false);
   };
 
   return (
     <div className="space-y-2">
-      <div className="panel relative h-[65vh] min-h-80 overflow-hidden">
+      <div ref={frame} className="panel relative h-[65vh] min-h-80 overflow-hidden">
+        {/* navegando, o mapa gira pra direção do motoboy ficar sempre pra
+            cima, como no Waze. A camada é um quadrado do tamanho da diagonal
+            da moldura, pra não aparecer canto vazio em nenhum ângulo. */}
+        <div
+          style={
+            rotating
+              ? {
+                  position: "absolute",
+                  left: "50%",
+                  top: "50%",
+                  width: diag,
+                  height: diag,
+                  transform: `translate(-50%, -50%) rotate(${-rot}deg)`,
+                  transition: "transform 0.6s linear",
+                }
+              : { position: "absolute", inset: 0 }
+          }
+        >
         <MapContainer
           center={[-8.05, -34.9]}
           zoom={13}
@@ -406,6 +448,7 @@ export function CourierMap({
         >
           <TileLayer url={TILES} attribution={ATTRIBUTION} className="map-clean" maxZoom={19} />
           <QuietAttribution />
+          <ResizeSync dep={`${rotating}-${diag}`} />
           {!navigating && <FitOnce points={[...(pos ? [pos] : []), ...located]} />}
           {navigating && <Follow pos={pos} follow={follow} onDrag={() => setFollow(false)} />}
 
@@ -425,7 +468,11 @@ export function CourierMap({
           )}
 
           {located.map((s, i) => (
-            <Marker key={s.id} position={[s.lat, s.lng]} icon={stopIcon(s.index, i === 0)} />
+            <Marker
+              key={s.id}
+              position={[s.lat, s.lng]}
+              icon={stopIcon(s.index, i === 0, rotating ? rot : 0)}
+            />
           ))}
           {pos && (
             <Marker
@@ -435,6 +482,14 @@ export function CourierMap({
             />
           )}
         </MapContainer>
+        </div>
+
+        {/* girado, o crédito do Leaflet pode cair fora da moldura */}
+        {rotating && (
+          <span className="pointer-events-none absolute bottom-1 left-2 z-[1000] text-[10px] text-black/60">
+            © OpenStreetMap
+          </span>
+        )}
 
         {/* instrução da próxima manobra, no topo, grande pra ler em movimento */}
         {navigating && next && (
@@ -445,7 +500,9 @@ export function CourierMap({
                 <p className="text-lg font-semibold">Você chegou</p>
               ) : leg ? (
                 <>
-                  <p className="text-2xl font-bold leading-none">{fmtDist(toNextTurn)}</p>
+                  <p className="text-2xl font-bold leading-none">
+                    {toNextTurn < 15 ? "Agora" : fmtDist(toNextTurn)}
+                  </p>
                   <p className="mt-1 truncate text-sm text-white/85">{instr.text}</p>
                 </>
               ) : (
@@ -514,7 +571,7 @@ export function CourierMap({
               <button
                 type="button"
                 onClick={() => {
-                  setNavigating(false);
+                  stop();
                   onOpenStops?.();
                 }}
                 className="w-full rounded-lg bg-success px-3 py-3 text-base font-semibold text-success-foreground"
@@ -524,7 +581,7 @@ export function CourierMap({
             ) : navigating ? (
               <button
                 type="button"
-                onClick={() => setNavigating(false)}
+                onClick={stop}
                 className="flex w-full items-center justify-center gap-2 rounded-lg border border-border px-3 py-3 text-base font-medium"
               >
                 <X className="size-5" /> Parar navegação
