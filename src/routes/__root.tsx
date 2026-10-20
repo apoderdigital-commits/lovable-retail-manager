@@ -80,6 +80,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { name: "theme-color", content: "#1e3a52" },
       { title: "Vieira Perfumes — Gestão de pedidos e entregas" },
       {
         name: "description",
@@ -112,6 +113,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: "https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap",
       },
       { rel: "icon", href: "/favicon.png", type: "image/png" },
+      // app instalável (Chrome/Edge no Windows: "Instalar Vieira Perfumes")
+      { rel: "manifest", href: "/manifest.webmanifest" },
+      { rel: "apple-touch-icon", href: "/icon-192.png" },
     ],
   }),
   shellComponent: RootShell,
@@ -136,6 +140,15 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  // registra o service worker que habilita "Instalar app". Fora de um
+  // iframe só: dentro do editor do Lovable ele não tem utilidade
+  useEffect(() => {
+    if (!("serviceWorker" in navigator) || window.self !== window.top) return;
+    navigator.serviceWorker.register("/sw.js").catch(() => {
+      // navegador sem suporte ou bloqueado: o sistema segue normal no navegador
+    });
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
