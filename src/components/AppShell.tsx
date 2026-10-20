@@ -130,6 +130,11 @@ export function AppShell({
     i.access === "admin" ? isAdmin : i.access === "staff" ? isStaff : isCourier || isAdmin,
   );
 
+  const logout = async () => {
+    await signOut();
+    navigate({ to: "/auth" });
+  };
+
   return (
     <div className="flex min-h-screen w-full bg-background">
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col bg-sidebar px-3 py-5 text-sidebar-foreground md:flex">
@@ -165,10 +170,7 @@ export function AppShell({
             variant="ghost"
             size="sm"
             className="mt-2 w-full justify-start px-2 text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-            onClick={async () => {
-              await signOut();
-              navigate({ to: "/auth" });
-            }}
+            onClick={logout}
           >
             <LogOut className="mr-2 size-4" /> Sair
           </Button>
@@ -176,6 +178,24 @@ export function AppShell({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
+        {/* no celular a barra lateral some, então quem está logado e o botão
+            de sair vão para uma faixa no topo */}
+        <div className="flex items-center gap-2 border-b border-border bg-sidebar px-4 py-2 text-sidebar-foreground md:hidden">
+          <Logo size="size-7" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium">{fullName || user.email}</p>
+            {role && <p className="text-[11px] text-sidebar-foreground/60">{ROLE_LABEL[role]}</p>}
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="shrink-0 text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            onClick={logout}
+          >
+            <LogOut className="mr-1.5 size-4" /> Sair
+          </Button>
+        </div>
+
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-card px-5 py-4">
           <div>
             <h1 className="font-display text-xl font-semibold text-foreground">{title}</h1>
