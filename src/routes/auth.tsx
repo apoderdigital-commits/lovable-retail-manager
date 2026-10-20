@@ -9,7 +9,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -29,61 +28,40 @@ export const Route = createFileRoute("/auth")({
 const schema = z.object({
   email: z.string().trim().email({ message: "E-mail inválido" }).max(255),
   password: z.string().min(6, { message: "A senha precisa de ao menos 6 caracteres" }).max(72),
-  fullName: z.string().trim().max(100).optional(),
 });
 
+// sem cadastro aberto: acesso novo só é criado por um admin, na tela Usuários
 function AuthPage() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
   const [busy, setBusy] = useState(false);
-  const [sent, setSent] = useState(false);
 
   useEffect(() => {
     if (!loading && user) navigate({ to: "/" });
   }, [loading, user, navigate]);
 
-  const submit = async (mode: "login" | "signup") => {
-    const parsed = schema.safeParse({ email, password, fullName });
+  const submit = async () => {
+    const parsed = schema.safeParse({ email, password });
     if (!parsed.success) {
       toast.error(parsed.error.issues[0]?.message ?? "Dados inválidos");
       return;
     }
     setBusy(true);
     try {
-      if (mode === "login") {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: parsed.data.email,
-          password: parsed.data.password,
-        });
-        if (error) throw error;
-        navigate({ to: "/" });
-      } else {
-        const { data, error } = await supabase.auth.signUp({
-          email: parsed.data.email,
-          password: parsed.data.password,
-          options: {
-            emailRedirectTo: window.location.origin,
-            data: { full_name: parsed.data.fullName || null },
-          },
-        });
-        if (error) throw error;
-        if (!data.session) {
-          setSent(true);
-          toast.success("Confirme seu e-mail para ativar a conta.");
-        } else {
-          navigate({ to: "/" });
-        }
-      }
+      const { error } = await supabase.auth.signInWithPassword({
+        email: parsed.data.email,
+        password: parsed.data.password,
+      });
+      if (error) throw error;
+      navigate({ to: "/" });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Não foi possível continuar");
     } finally {
       setBusy(false);
     }
   };
-
 
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
@@ -102,87 +80,49 @@ function AuthPage() {
           </p>
         </div>
         <p className="text-xs text-sidebar-foreground/50">
-          O primeiro cadastro da loja recebe acesso de administrador.
+          Novos acessos são criados pelo administrador da loja.
         </p>
       </div>
 
       <div className="flex items-center justify-center p-6">
-        <div className="w-full max-w-sm">
+        <form
+          className="w-full max-w-sm"
+          onSubmit={(e) => {
+            e.preventDefault();
+            submit();
+          }}
+        >
           <h1 className="font-display text-2xl font-semibold">Acesso à loja</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Entre com sua conta ou crie um novo acesso.
+            Entre com sua conta. Sem acesso? Peça ao administrador da loja.
           </p>
 
-          {sent ? (
-            <div className="panel mt-6 p-4 text-sm">
-              Enviamos um link de confirmação para <strong>{email}</strong>. Confirme para entrar.
+          <div className="mt-6 space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="email">E-mail</Label>
+              <Input
+                id="email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
             </div>
-          ) : (
-            <Tabs defaultValue="login" className="mt-6">
-              <TabsList className="w-full">
-                <TabsTrigger value="login" className="flex-1">
-                  Entrar
-                </TabsTrigger>
-                <TabsTrigger value="signup" className="flex-1">
-                  Criar conta
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="login" className="mt-4 space-y-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="email">E-mail</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="password">Senha</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                </div>
-                <Button className="w-full" disabled={busy} onClick={() => submit("login")}>
-                  Entrar
-                </Button>
-              </TabsContent>
-
-              <TabsContent value="signup" className="mt-4 space-y-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="name">Nome</Label>
-                  <Input id="name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="email2">E-mail</Label>
-                  <Input
-                    id="email2"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="password2">Senha</Label>
-                  <Input
-                    id="password2"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                </div>
-                <Button className="w-full" disabled={busy} onClick={() => submit("signup")}>
-                  Criar conta
-                </Button>
-              </TabsContent>
-            </Tabs>
-          )}
-
-        </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="password">Senha</Label>
+              <Input
+                id="password"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={busy}>
+              Entrar
+            </Button>
+          </div>
+        </form>
       </div>
     </div>
   );
