@@ -29,11 +29,13 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
 import { brl } from "@/lib/format";
+import { MultiSelect } from "@/components/ui/multi-select";
 
 export const Route = createFileRoute("/produtos")({
   head: () => ({
@@ -90,6 +92,7 @@ function ProductsPage() {
   const { isAdmin } = useAuth();
   const qc = useQueryClient();
   const [term, setTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<ProductForm>(empty);
 
@@ -161,10 +164,70 @@ function ProductsPage() {
     onError: () => toast.error("Não foi possível excluir o produto"),
   });
 
-  const filtered = products.filter((p) =>
-    `${p.name} ${p.sku ?? ""} ${categoryNameOf(p.category_id)}`
-      .toLowerCase()
-      .includes(term.toLowerCase()),
+  // "none" representa produto sem categoria, pra também dar pra filtrar por ele
+  const inCategory = (p: (typeof products)[number]) =>
+    categoryFilter.length === 0 || categoryFilter.includes(p.category_id ?? "none");
+
+  const filtered = products
+    .filter(inCategory)
+    .filter((p) =>
+      `${p.name} ${p.sku ?? ""} ${categoryNameOf(p.category_id)}`
+        .toLowerCase()
+        .includes(term.toLowerCase()),
+    );
+
+  // balanço por categoria: segue o filtro de categoria, mas não a busca por
+  // texto — a busca serve pra achar um produto, não pra recortar o balanço
+  const balance = Object.values(
+    products.filter(inCategory).reduce<
+      Record<
+        string,
+        {
+          name: string;
+          products: number;
+          stock: number;
+          reserved: number;
+          available: number;
+          cost: number;
+          retail: number;
+          alerts: number;
+        }
+      >
+    >((acc, p) => {
+      const key = p.category_id ?? "none";
+      const cur = acc[key] ?? {
+        name: categoryNameOf(p.category_id) || "Sem categoria",
+        products: 0,
+        stock: 0,
+        reserved: 0,
+        available: 0,
+        cost: 0,
+        retail: 0,
+        alerts: 0,
+      };
+      cur.products += 1;
+      cur.stock += p.stock;
+      cur.reserved += p.reserved_stock;
+      cur.available += p.available_stock ?? 0;
+      cur.cost += p.stock * Number(p.cost_price);
+      cur.retail += p.stock * Number(p.price);
+      if ((p.available_stock ?? 0) <= p.min_stock) cur.alerts += 1;
+      acc[key] = cur;
+      return acc;
+    }, {}),
+  ).sort((a, b) => b.stock - a.stock);
+
+  const balanceTotal = balance.reduce(
+    (t, c) => ({
+      products: t.products + c.products,
+      stock: t.stock + c.stock,
+      reserved: t.reserved + c.reserved,
+      available: t.available + c.available,
+      cost: t.cost + c.cost,
+      retail: t.retail + c.retail,
+      alerts: t.alerts + c.alerts,
+    }),
+    { products: 0, stock: 0, reserved: 0, available: 0, cost: 0, retail: 0, alerts: 0 },
   );
 
   const openEdit = (p: (typeof products)[number]) => {
@@ -293,14 +356,88 @@ function ProductsPage() {
         </div>
       }
     >
+      <section className="panel mb-5 overflow-hidden">
+        <header className="border-b border-border px-4 py-3">
+          <h2 className="font-display text-base font-semibold">Balanço por categoria</h2>
+        </header>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Categoria</TableHead>
+              <TableHead className="text-right">Produtos</TableHead>
+              <TableHead className="text-right">Disponível</TableHead>
+              <TableHead className="text-right">Reservado</TableHead>
+              <TableHead className="text-right">Físico</TableHead>
+              <TableHead className="text-right">Valor a custo</TableHead>
+              <TableHead className="text-right">Valor a varejo</TableHead>
+              <TableHead className="text-right">Alertas</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {balance.map((c) => (
+              <TableRow key={c.name}>
+                <TableCell className="font-medium">{c.name}</TableCell>
+                <TableCell className="text-right text-muted-foreground">{c.products}</TableCell>
+                <TableCell className="text-right font-medium">{c.available}</TableCell>
+                <TableCell className="text-right text-muted-foreground">{c.reserved}</TableCell>
+                <TableCell className="text-right text-muted-foreground">{c.stock}</TableCell>
+                <TableCell className="text-right">{brl(c.cost)}</TableCell>
+                <TableCell className="text-right">{brl(c.retail)}</TableCell>
+                <TableCell className="text-right">
+                  {c.alerts > 0 ? (
+                    <span className="font-medium text-destructive">{c.alerts}</span>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+            {balance.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+                  Nenhum produto nas categorias selecionadas.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+          {balance.length > 1 && (
+            <TableFooter>
+              <TableRow>
+                <TableCell className="font-semibold">Total</TableCell>
+                <TableCell className="text-right font-semibold">{balanceTotal.products}</TableCell>
+                <TableCell className="text-right font-semibold">{balanceTotal.available}</TableCell>
+                <TableCell className="text-right font-semibold">{balanceTotal.reserved}</TableCell>
+                <TableCell className="text-right font-semibold">{balanceTotal.stock}</TableCell>
+                <TableCell className="text-right font-semibold">{brl(balanceTotal.cost)}</TableCell>
+                <TableCell className="text-right font-semibold">{brl(balanceTotal.retail)}</TableCell>
+                <TableCell className="text-right font-semibold">{balanceTotal.alerts}</TableCell>
+              </TableRow>
+            </TableFooter>
+          )}
+        </Table>
+      </section>
+
       <div className="panel overflow-hidden">
-        <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-          <Search className="size-4 text-muted-foreground" />
-          <input
-            className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-            placeholder="Buscar por nome, código ou categoria"
-            value={term}
-            onChange={(e) => setTerm(e.target.value)}
+        <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
+          <div className="flex min-w-40 flex-1 items-center gap-2">
+            <Search className="size-4 shrink-0 text-muted-foreground" />
+            <input
+              className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+              placeholder="Buscar por nome, código ou categoria"
+              value={term}
+              onChange={(e) => setTerm(e.target.value)}
+            />
+          </div>
+          <MultiSelect
+            options={[
+              ...categories.map((c) => ({ value: c.id, label: c.name })),
+              { value: "none", label: "Sem categoria" },
+            ]}
+            selected={categoryFilter}
+            onChange={setCategoryFilter}
+            placeholder="Categoria"
+            allLabel="Todas as categorias"
+            icon={<Tags className="size-3.5" />}
           />
         </div>
         <Table>
