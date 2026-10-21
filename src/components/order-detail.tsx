@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { brl } from "@/lib/format";
+import { brl, dateTimeFull } from "@/lib/format";
 import type { Database } from "@/integrations/supabase/types";
 
 type Status = Database["public"]["Enums"]["order_status"];
@@ -232,7 +232,7 @@ export function OrderDetail({
                       {STATUS_LABEL[h.to_status]}
                     </span>
                     <span className="text-muted-foreground">
-                      {new Date(h.created_at).toLocaleString("pt-BR")}
+                      {dateTimeFull(h.created_at)}
                     </span>
                   </div>
                 ))}

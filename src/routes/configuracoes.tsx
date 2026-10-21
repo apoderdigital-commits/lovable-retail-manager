@@ -235,7 +235,7 @@ function SettingsPage() {
             <p className="mb-3 text-xs text-muted-foreground">
               Token terminado em <code className="rounded bg-muted px-1">{status.token_tail}</code>
               {status.updated_at &&
-                ` · atualizado em ${new Date(status.updated_at).toLocaleDateString("pt-BR")}`}
+                ` · atualizado em ${new Date(status.updated_at).toLocaleDateString("pt-BR", { timeZone: "America/Recife" })}`}
             </p>
           )}
 
@@ -335,7 +335,7 @@ function SettingsPage() {
             <p className="mb-3 text-xs text-muted-foreground">
               Chave terminada em <code className="rounded bg-muted px-1">{crmStatus.key_tail}</code>
               {crmStatus.updated_at &&
-                ` · atualizado em ${new Date(crmStatus.updated_at).toLocaleDateString("pt-BR")}`}
+                ` · atualizado em ${new Date(crmStatus.updated_at).toLocaleDateString("pt-BR", { timeZone: "America/Recife" })}`}
             </p>
           )}
 

@@ -36,7 +36,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { brl, dateTime } from "@/lib/format";
+import {
+  addDaysISO,
+  brl,
+  dateTime,
+  dayEnd,
+  dayStart,
+  monthStartISO,
+  todayISO,
+} from "@/lib/format";
 import { ReceiptSheet } from "@/components/receipt/ReceiptSheet";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { useAuth } from "@/hooks/useAuth";
@@ -54,24 +62,12 @@ export const Route = createFileRoute("/vendas")({
   component: SalesHistoryPage,
 });
 
-function startOfDay(d: Date) {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
-function addDays(d: Date, days: number) {
-  const x = new Date(d);
-  x.setDate(x.getDate() + days);
-  return x;
-}
+// limites dos resumos sempre no dia de Recife, não no fuso do aparelho
+const at = (day: string) => new Date(dayStart(day));
 // segunda-feira como início da semana
-function startOfWeek(d: Date) {
-  const x = startOfDay(d);
-  const day = x.getDay();
-  return addDays(x, day === 0 ? -6 : 1 - day);
-}
-function startOfMonth(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth(), 1);
+function weekStartISO(today: string) {
+  const dow = new Date(`${today}T12:00:00-03:00`).getUTCDay();
+  return addDaysISO(today, dow === 0 ? -6 : 1 - dow);
 }
 
 function paymentIcon(method: string) {
@@ -106,7 +102,7 @@ function SalesHistoryPage() {
         .order("created_at", { ascending: false });
       if (onlyMine) q = q.eq("seller_id", onlyMine);
       q = day
-        ? q.gte("created_at", `${day}T00:00:00`).lte("created_at", `${day}T23:59:59`)
+        ? q.gte("created_at", dayStart(day)).lte("created_at", dayEnd(day))
         : q.limit(300);
       const { data, error } = await q;
       if (error) throw error;
@@ -183,12 +179,12 @@ function SalesHistoryPage() {
   });
 
   const summary = useMemo(() => {
-    const now = new Date();
-    const todayStart = startOfDay(now);
-    const tomorrowStart = addDays(todayStart, 1);
-    const yesterdayStart = addDays(todayStart, -1);
-    const weekStart = startOfWeek(now);
-    const monthStart = startOfMonth(now);
+    const today = todayISO();
+    const todayStart = at(today);
+    const tomorrowStart = at(addDaysISO(today, 1));
+    const yesterdayStart = at(addDaysISO(today, -1));
+    const weekStart = at(weekStartISO(today));
+    const monthStart = at(monthStartISO());
 
     const bucket = (from: Date, to: Date) => {
       const list = sales.filter((s) => {

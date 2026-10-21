@@ -1,5 +1,5 @@
 import { forwardRef } from "react";
-import { brl } from "@/lib/format";
+import { brl, dateTimeFull } from "@/lib/format";
 
 export type ReceiptSale = {
   sale_number: number;
@@ -61,7 +61,7 @@ export const Receipt = forwardRef<
         </div>
         <div className="flex justify-between">
           <span>Data</span>
-          <span>{new Date(sale.created_at).toLocaleString("pt-BR")}</span>
+          <span>{dateTimeFull(sale.created_at)}</span>
         </div>
         {sale.customer_name && (
           <div className="flex justify-between gap-2">

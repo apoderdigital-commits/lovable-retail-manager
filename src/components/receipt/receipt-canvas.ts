@@ -1,4 +1,4 @@
-import { brl } from "@/lib/format";
+import { brl, dateTimeFull } from "@/lib/format";
 
 export type ReceiptCanvasSale = {
   sale_number: number;
@@ -163,7 +163,7 @@ export function renderReceiptCanvas(
   divider();
 
   row("Pedido", `#${sale.sale_number}`);
-  row("Data", new Date(sale.created_at).toLocaleString("pt-BR"));
+  row("Data", dateTimeFull(sale.created_at));
   if (sale.customer_name) {
     ctx.font = `12px ${FONT}`;
     row("Cliente", truncate(ctx, sale.customer_name, contentWidth * 0.55));

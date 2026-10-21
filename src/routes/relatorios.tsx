@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { AppShell, Metric } from "@/components/AppShell";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { brl, dateTime } from "@/lib/format";
+import { brl, dateTime, dayEnd, dayStart, monthStartISO, todayISO } from "@/lib/format";
 import {
   Table,
   TableBody,
@@ -16,11 +16,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-const firstOfMonth = () => {
-  const d = new Date();
-  return new Date(d.getFullYear(), d.getMonth(), 1).toLocaleDateString("sv-SE");
-};
-const today = () => new Date().toLocaleDateString("sv-SE");
+// dia de hoje e início do mês em Recife (não no fuso do aparelho)
+const firstOfMonth = monthStartISO;
+const today = () => todayISO();
 
 export const Route = createFileRoute("/relatorios")({
   head: () => ({
@@ -51,14 +49,14 @@ function ReportsPage() {
         supabase
           .from("sales")
           .select("id, sale_number, total, discount, payment_method, created_at")
-          .gte("created_at", `${from}T00:00:00`)
-          .lte("created_at", `${to}T23:59:59`)
+          .gte("created_at", dayStart(from))
+          .lte("created_at", dayEnd(to))
           .order("created_at", { ascending: false }),
         supabase
           .from("sale_items")
           .select("product_name, quantity, total, created_at, products(product_categories(name))")
-          .gte("created_at", `${from}T00:00:00`)
-          .lte("created_at", `${to}T23:59:59`),
+          .gte("created_at", dayStart(from))
+          .lte("created_at", dayEnd(to)),
       ]);
       if (salesRes.error) throw salesRes.error;
       if (itemsRes.error) throw itemsRes.error;

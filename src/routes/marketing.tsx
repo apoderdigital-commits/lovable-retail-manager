@@ -16,7 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { brl } from "@/lib/format";
+import { brl, monthStartISO, todayISO } from "@/lib/format";
 
 export const Route = createFileRoute("/marketing")({
   head: () => ({
@@ -67,11 +67,9 @@ type Ltv = {
   avg_orders: number;
 };
 
-const firstOfMonth = () => {
-  const d = new Date();
-  return new Date(d.getFullYear(), d.getMonth(), 1).toLocaleDateString("sv-SE");
-};
-const today = () => new Date().toLocaleDateString("sv-SE");
+// dia de hoje e início do mês em Recife (não no fuso do aparelho)
+const firstOfMonth = monthStartISO;
+const today = () => todayISO();
 
 // divisão que não explode quando o denominador é zero
 const per = (a: number, b: number) => (b > 0 ? a / b : null);

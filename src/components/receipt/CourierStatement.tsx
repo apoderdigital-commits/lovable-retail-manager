@@ -1,5 +1,5 @@
 import { forwardRef } from "react";
-import { brl } from "@/lib/format";
+import { brl, dayBr } from "@/lib/format";
 
 export type CourierStatementData = {
   courierId: string;
@@ -11,7 +11,7 @@ export type CourierStatementData = {
   apurado: number;
 };
 
-const dateBr = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString("pt-BR");
+const dateBr = dayBr;
 
 // 1mm ~= 3.78px a 96dpi. "auto" (impressora comum) fica com uma largura de
 // leitura confortável, sem forçar bobina estreita.

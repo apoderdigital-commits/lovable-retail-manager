@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Polyline, useMap, useMapEvents } from 
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { keepAwakeOn, keepAwakeOff } from "@/lib/keep-awake";
+import { TZ } from "@/lib/format";
 import {
   ArrowUp,
   ArrowLeft,
@@ -555,7 +556,7 @@ export function CourierMap({
                 <p className="font-display text-xl font-bold leading-none">
                   {new Date(
                     Date.now() + (navigating ? leg : overview)!.duration * 1000,
-                  ).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                  ).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: TZ })}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {fmtMin((navigating ? leg : overview)!.duration)} ·{" "}

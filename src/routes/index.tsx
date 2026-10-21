@@ -4,7 +4,7 @@ import { ShoppingCart, TriangleAlert } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell, Metric, StockBadge } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
-import { brl, dateTime } from "@/lib/format";
+import { brl, dateTime, dayStart, monthStartISO, todayISO } from "@/lib/format";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -28,15 +28,13 @@ function Dashboard() {
   const { data } = useQuery({
     queryKey: ["dashboard"],
     queryFn: async () => {
-      const startOfDay = new Date();
-      startOfDay.setHours(0, 0, 0, 0);
-      const startOfMonth = new Date();
-      startOfMonth.setDate(1);
-      startOfMonth.setHours(0, 0, 0, 0);
+      // início do dia e do mês em Recife, não no fuso do aparelho
+      const startOfDay = dayStart(todayISO());
+      const startOfMonth = dayStart(monthStartISO());
 
       const [today, month, products, recent, itemsToday] = await Promise.all([
-        supabase.from("sales").select("total").gte("created_at", startOfDay.toISOString()),
-        supabase.from("sales").select("total").gte("created_at", startOfMonth.toISOString()),
+        supabase.from("sales").select("total").gte("created_at", startOfDay),
+        supabase.from("sales").select("total").gte("created_at", startOfMonth),
         supabase.from("products").select("*").order("stock", { ascending: true }),
         supabase
           .from("sales")
@@ -46,7 +44,7 @@ function Dashboard() {
         supabase
           .from("sale_items")
           .select("product_id, quantity")
-          .gte("created_at", startOfDay.toISOString()),
+          .gte("created_at", startOfDay),
       ]);
 
       const todayRows = today.data ?? [];

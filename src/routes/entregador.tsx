@@ -37,7 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { brl } from "@/lib/format";
+import { brl, timeShort, todayISO } from "@/lib/format";
 
 export const Route = createFileRoute("/entregador")({
   head: () => ({
@@ -72,7 +72,7 @@ type RouteSummary = {
   cash_collected: number;
 };
 
-const todayISO = () => new Date().toLocaleDateString("sv-SE");
+
 
 // rua, bairro e cidade numa linha só — é o que a busca do mapa procura.
 // a cidade vem do ViaCEP como "Recife - PE"; o " - PE" atrapalha a busca
@@ -172,7 +172,7 @@ function CourierPage() {
     enabled: !!courierId,
     queryFn: async () => {
       const { data, error } = await supabase.rpc("route_day_summary", {
-        p_date: new Date().toLocaleDateString("sv-SE"),
+        p_date: todayISO(),
       });
       if (error) throw error;
       return ((data ?? []) as RouteSummary[]).filter((r) => r.courier_id === courierId);
@@ -439,10 +439,7 @@ function CourierPage() {
             <Flag className="mr-2 size-4" />
             Encerrar saída
             {openRoutes.length > 1 && r.dispatched_at
-              ? ` das ${new Date(r.dispatched_at).toLocaleTimeString("pt-BR", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}`
+              ? ` das ${timeShort(r.dispatched_at)}`
               : ""}
           </Button>
         ))}

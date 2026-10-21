@@ -35,7 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { brl } from "@/lib/format";
+import { brl, TZ, timeShort, todayISO } from "@/lib/format";
 
 export const Route = createFileRoute("/entregas")({
   head: () => ({
@@ -64,7 +64,7 @@ type RouteSummary = {
 };
 
 // data local no formato YYYY-MM-DD, sem escorregar de fuso
-const todayISO = () => new Date().toLocaleDateString("sv-SE");
+
 
 function DeliveriesPage() {
   const qc = useQueryClient();
@@ -240,6 +240,7 @@ function DeliveriesPage() {
     <AppShell
       title="Entregas"
       subtitle={new Date().toLocaleDateString("pt-BR", {
+        timeZone: TZ,
         weekday: "long",
         day: "numeric",
         month: "long",
@@ -418,10 +419,7 @@ function DeliveriesPage() {
                   {running.map((r) => {
                     const sm = summaryOf(r.id);
                     const hora = r.dispatched_at
-                      ? new Date(r.dispatched_at).toLocaleTimeString("pt-BR", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })
+                      ? timeShort(r.dispatched_at)
                       : "";
                     return closing === r.id ? (
                       <div key={r.id} className="space-y-1.5 rounded-md bg-muted/50 p-2">

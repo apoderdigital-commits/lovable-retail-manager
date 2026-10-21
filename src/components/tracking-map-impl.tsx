@@ -65,7 +65,7 @@ export function TrackingMap({
           <Popup>
             <strong>{c.name}</strong>
             <br />
-            {c.updatedAt ? new Date(c.updatedAt).toLocaleTimeString("pt-BR") : "sem horário"}
+            {c.updatedAt ? new Date(c.updatedAt).toLocaleTimeString("pt-BR", { timeZone: "America/Recife" }) : "sem horário"}
           </Popup>
         </Marker>
       ))}

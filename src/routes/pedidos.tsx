@@ -24,7 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { brl } from "@/lib/format";
+import { brl, dateBr, dayBr } from "@/lib/format";
 import { ReceiptSheet } from "@/components/receipt/ReceiptSheet";
 import { PrintSettingsDialog } from "@/components/print-settings-dialog";
 import { MultiSelect } from "@/components/ui/multi-select";
@@ -176,12 +176,12 @@ function OrdersPage() {
                   <StatusBadge status={o.status} />
                   {o.status === "scheduled" && o.scheduled_for && (
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      para {new Date(`${o.scheduled_for}T00:00:00`).toLocaleDateString("pt-BR")}
+                      para {dayBr(o.scheduled_for)}
                     </p>
                   )}
                 </TableCell>
                 <TableCell className="text-muted-foreground">
-                  {new Date(o.created_at).toLocaleDateString("pt-BR")}
+                  {dateBr(o.created_at)}
                 </TableCell>
                 <TableCell>
                   <div className="flex justify-end gap-1">

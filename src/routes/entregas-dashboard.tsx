@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import { CourierStatementPrint, type CourierStatementData } from "@/components/receipt/CourierStatement";
 import { usePrintSettings, printPageStyle } from "@/hooks/use-print-settings";
-import { brl } from "@/lib/format";
+import { brl, todayISO } from "@/lib/format";
 
 export const Route = createFileRoute("/entregas-dashboard")({
   head: () => ({
@@ -50,7 +50,7 @@ type PaymentBreakdown = {
   amount: number;
 };
 
-const todayISO = () => new Date().toLocaleDateString("sv-SE");
+
 
 // dinheiro, pix e boleto entram como estão; débito e crédito viram "Cartão"
 // porque pra quem confere a rua no fim do dia o que importa é se caiu na
