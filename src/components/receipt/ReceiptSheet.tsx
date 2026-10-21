@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Receipt, type ReceiptItem, type ReceiptSale } from "@/components/receipt/Receipt";
 import { renderReceiptCanvas } from "@/components/receipt/receipt-canvas";
+import { brl } from "@/lib/format";
 
 // 1mm ~= 3.78px a 96dpi. "auto" (impressora comum) fica com uma largura de
 // leitura confortável, sem forçar bobina estreita.
@@ -52,7 +53,10 @@ export function ReceiptSheet({ saleId, onClose }: { saleId: string | null; onClo
     return {
       sale_number: sale.sale_number,
       created_at: sale.created_at,
-      payment_method: sale.payment_method,
+      // pagamento dividido na entrega: "pix R$ 60,00 + dinheiro R$ 40,00"
+      payment_method: sale.payment_method_2
+        ? `${sale.payment_method} ${brl(total - Number(sale.payment_amount_2))} + ${sale.payment_method_2} ${brl(Number(sale.payment_amount_2))}`
+        : sale.payment_method,
       discount,
       subtotal,
       // taxa cobrada do cliente = o que o total tem a mais que os produtos.

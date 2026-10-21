@@ -568,7 +568,9 @@ export type Database = {
           neighborhood: string | null
           notes: string | null
           offer_id: string | null
+          payment_amount_2: number
           payment_method: string
+          payment_method_2: string | null
           proof_url: string | null
           reason: string | null
           route_id: string | null
@@ -595,7 +597,9 @@ export type Database = {
           neighborhood?: string | null
           notes?: string | null
           offer_id?: string | null
+          payment_amount_2?: number
           payment_method?: string
+          payment_method_2?: string | null
           proof_url?: string | null
           reason?: string | null
           route_id?: string | null
@@ -622,7 +626,9 @@ export type Database = {
           neighborhood?: string | null
           notes?: string | null
           offer_id?: string | null
+          payment_amount_2?: number
           payment_method?: string
+          payment_method_2?: string | null
           proof_url?: string | null
           reason?: string | null
           route_id?: string | null
@@ -773,7 +779,9 @@ export type Database = {
           neighborhood: string | null
           notes: string | null
           offer_id: string | null
+          payment_amount_2: number
           payment_method: string
+          payment_method_2: string | null
           proof_url: string | null
           reason: string | null
           route_id: string | null
@@ -930,7 +938,9 @@ export type Database = {
           neighborhood: string | null
           notes: string | null
           offer_id: string | null
+          payment_amount_2: number
           payment_method: string
+          payment_method_2: string | null
           proof_url: string | null
           reason: string | null
           route_id: string | null

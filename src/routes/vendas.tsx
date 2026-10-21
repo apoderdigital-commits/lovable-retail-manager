@@ -84,7 +84,9 @@ function paymentIcon(method: string) {
 
 function SalesHistoryPage() {
   const qc = useQueryClient();
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
+  // vendedor vê só as vendas que ele fez; admin vê todas
+  const onlyMine = !isAdmin && user ? user.id : null;
   const [term, setTerm] = useState("");
   const [sellerFilter, setSellerFilter] = useState<string[]>([]);
   const [day, setDay] = useState("");
@@ -96,12 +98,13 @@ function SalesHistoryPage() {
   // dia marcado, busca o dia inteiro sem limite — senão um dia antigo
   // podia sumir da lista só por estar fora das 300 mais recentes.
   const { data: sales = [], isLoading } = useQuery({
-    queryKey: ["sales-history", day],
+    queryKey: ["sales-history", day, onlyMine],
     queryFn: async () => {
       let q = supabase
         .from("sales")
         .select("*, customers(name, phone, customer_type)")
         .order("created_at", { ascending: false });
+      if (onlyMine) q = q.eq("seller_id", onlyMine);
       q = day
         ? q.gte("created_at", `${day}T00:00:00`).lte("created_at", `${day}T23:59:59`)
         : q.limit(300);
@@ -227,14 +230,16 @@ function SalesHistoryPage() {
               onChange={(e) => setTerm(e.target.value)}
             />
           </div>
-          <MultiSelect
-            options={sellerOptions}
-            selected={sellerFilter}
-            onChange={setSellerFilter}
-            placeholder="Vendedor"
-            allLabel="Todos os vendedores"
-            icon={<User className="size-3.5" />}
-          />
+          {isAdmin && (
+            <MultiSelect
+              options={sellerOptions}
+              selected={sellerFilter}
+              onChange={setSellerFilter}
+              placeholder="Vendedor"
+              allLabel="Todos os vendedores"
+              icon={<User className="size-3.5" />}
+            />
+          )}
           <input
             type="date"
             className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
@@ -266,12 +271,15 @@ function SalesHistoryPage() {
             {filtered.map((s) => {
               const PaymentIcon = paymentIcon(s.payment_method);
               const cancelled = s.status === "cancelled";
-              // balcão concluído (sem entregador nem rota) só admin cancela:
-              // a venda já foi paga e o estoque volta pra prateleira
-              const balcaoConcluido =
-                s.status === "delivered" && !s.courier_id && !s.route_id;
+              // balcão: o vendedor que fez cancela (admin também), mesmo já
+              // concluída — o estoque volta pra prateleira. Entrega: só admin,
+              // e só antes de entregue. A regra de verdade está no banco.
+              const balcao = !s.delivery_address && !s.courier_id && !s.route_id;
               const podeCancel =
-                !cancelled && (s.status !== "delivered" || (balcaoConcluido && isAdmin));
+                !cancelled &&
+                (balcao
+                  ? isAdmin || s.seller_id === user?.id
+                  : isAdmin && s.status !== "delivered");
               const items = itemCounts.get(s.id) ?? 0;
 
               return (

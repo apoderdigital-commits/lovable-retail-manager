@@ -29,6 +29,7 @@ import { ReceiptSheet } from "@/components/receipt/ReceiptSheet";
 import { PrintSettingsDialog } from "@/components/print-settings-dialog";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { OrderDetail } from "@/components/order-detail";
+import { useAuth } from "@/hooks/useAuth";
 import type { Database } from "@/integrations/supabase/types";
 
 type Status = Database["public"]["Enums"]["order_status"];
@@ -65,6 +66,7 @@ function StatusBadge({ status }: { status: Status }) {
 
 function OrdersPage() {
   const qc = useQueryClient();
+  const { isAdmin, user } = useAuth();
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [term, setTerm] = useState("");
   const [cancelling, setCancelling] = useState<string | null>(null);
@@ -212,7 +214,10 @@ function OrdersPage() {
                       </Button>
                     )}
 
-                    {o.status !== "delivered" && o.status !== "cancelled" && (
+                    {/* pedido de entrega só admin cancela; balcão, quem vendeu */}
+                    {o.status !== "delivered" &&
+                      o.status !== "cancelled" &&
+                      (isAdmin || (!o.delivery_address && o.seller_id === user?.id)) && (
                       <Button variant="ghost" size="icon" onClick={() => setCancelling(o.id)}>
                         <Ban className="size-4 text-destructive" />
                       </Button>

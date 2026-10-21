@@ -43,7 +43,7 @@ export function OrderDetail({
 }: {
   saleId: string | null;
   onClose: () => void;
-  action?: { label: string; onClick: () => void; pending?: boolean };
+  action?: { label: string; onClick: () => void; pending?: boolean } | undefined;
 }) {
   const { data: sale } = useQuery({
     queryKey: ["order-detail", saleId],
@@ -205,7 +205,11 @@ export function OrderDetail({
                 </div>
                 <div className="flex justify-between text-muted-foreground">
                   <span>Pagamento</span>
-                  <span className="capitalize">{sale.payment_method}</span>
+                  <span className="text-right">
+                    {sale.payment_method_2
+                      ? `${sale.payment_method} ${brl(total - Number(sale.payment_amount_2))} + ${sale.payment_method_2} ${brl(Number(sale.payment_amount_2))}`
+                      : sale.payment_method}
+                  </span>
                 </div>
               </div>
             </section>

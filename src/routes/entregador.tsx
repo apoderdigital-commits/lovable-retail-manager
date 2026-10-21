@@ -52,6 +52,8 @@ export const Route = createFileRoute("/entregador")({
   component: CourierPage,
 });
 
+const PAYMENTS = ["dinheiro", "pix", "débito", "crédito", "boleto"];
+
 const REASONS = [
   "Cliente ausente",
   "Endereço não localizado",
@@ -454,6 +456,8 @@ type Stop = {
   sale_number: number;
   total: number;
   payment_method: string;
+  payment_method_2: string | null;
+  payment_amount_2: number;
   delivery_address: string | null;
   neighborhood: string | null;
   city: string | null;
@@ -471,8 +475,8 @@ function StopCard({
   stop: Stop;
   index: number;
   onDone: () => void;
-  onUp?: () => void;
-  onDown?: () => void;
+  onUp?: (() => void) | undefined;
+  onDown?: (() => void) | undefined;
 }) {
   const { user } = useAuth();
   const [action, setAction] = useState<null | "deliver" | "schedule" | "fail">(null);
@@ -480,11 +484,37 @@ function StopCard({
   const [date, setDate] = useState("");
   const [reason, setReason] = useState(REASONS[0]);
 
+  // pagamento na hora da entrega: o cliente pode trocar a forma ou dividir
+  // em duas (ex.: parte no pix, parte em dinheiro)
+  const total = Number(stop.total);
+  const [pay1, setPay1] = useState(stop.payment_method);
+  const [split, setSplit] = useState(!!stop.payment_method_2);
+  const [pay2, setPay2] = useState(stop.payment_method_2 ?? "pix");
+  const [amount2, setAmount2] = useState(
+    stop.payment_method_2 ? String(stop.payment_amount_2) : "",
+  );
+  const value2 = Number(amount2.replace(",", ".") || 0);
+  const splitInvalid = split && (pay2 === pay1 || value2 <= 0 || value2 >= total);
+  const paymentChanged =
+    pay1 !== stop.payment_method ||
+    (split ? pay2 : null) !== (stop.payment_method_2 ?? null) ||
+    (split ? value2 : 0) !== Number(stop.payment_amount_2 ?? 0);
+
   const run = useMutation({
     mutationFn: async () => {
       if (action === "deliver") {
-        if (!file) throw new Error("Tire a foto do comprovante");
+        if (!file) throw new Error("Envie a foto do comprovante");
         if (!user) throw new Error("Sessão expirada");
+        if (splitInvalid) throw new Error("Confira as duas formas de pagamento");
+        if (paymentChanged) {
+          const { error: payErr } = await supabase.rpc("set_delivery_payment" as never, {
+            p_sale: stop.id,
+            p_method: pay1,
+            p_method_2: split ? pay2 : null,
+            p_amount_2: split ? value2 : 0,
+          } as never);
+          if (payErr) throw payErr;
+        }
         const ext = file.name.split(".").pop() || "jpg";
         // a pasta precisa ser o id de quem envia: é o que a política do bucket exige
         const path = `${user.id}/${stop.id}-${Date.now()}.${ext}`;
@@ -581,7 +611,10 @@ function StopCard({
 
       <div className="mt-3 flex items-center justify-between">
         <span className="font-display text-lg font-semibold">{brl(Number(stop.total))}</span>
-        <span className="text-sm text-muted-foreground">{stop.payment_method}</span>
+        <span className="text-sm text-muted-foreground">
+          {stop.payment_method}
+          {stop.payment_method_2 ? ` + ${stop.payment_method_2}` : ""}
+        </span>
       </div>
 
       {stop.customers?.phone && (
@@ -618,18 +651,84 @@ function StopCard({
           </DialogHeader>
 
           {action === "deliver" && (
-            <div className="space-y-2">
-              <Label>Foto do comprovante</Label>
-              <Input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Sem a foto a entrega não é concluída. Vale o comprovante de pagamento ou a nota
-                assinada.
-              </p>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Forma de pagamento</Label>
+                <Select value={pay1} onValueChange={setPay1}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAYMENTS.map((p) => (
+                      <SelectItem key={p} value={p}>
+                        {p}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={split}
+                    onChange={(e) => setSplit(e.target.checked)}
+                  />
+                  Cliente pagou em 2 formas
+                </label>
+
+                {split && (
+                  <div className="space-y-2 rounded-md border border-border p-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      <Select value={pay2} onValueChange={setPay2}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PAYMENTS.filter((p) => p !== pay1).map((p) => (
+                            <SelectItem key={p} value={p}>
+                              {p}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        type="number"
+                        inputMode="decimal"
+                        step="0.01"
+                        placeholder="Valor"
+                        value={amount2}
+                        onChange={(e) => setAmount2(e.target.value)}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {pay1}: <strong>{brl(Math.max(0, total - value2))}</strong> · {pay2}:{" "}
+                      <strong>{brl(value2)}</strong> · total {brl(total)}
+                    </p>
+                    {splitInvalid && (
+                      <p className="text-xs text-destructive">
+                        {pay2 === pay1
+                          ? "Escolha duas formas diferentes."
+                          : `O valor precisa ser maior que zero e menor que ${brl(total)}.`}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Foto do comprovante</Label>
+                {/* sem "capture": o celular oferece tirar foto agora ou
+                    escolher uma da galeria */}
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Tire a foto na hora ou escolha da galeria. Sem a foto a entrega não é concluída.
+                  Vale o comprovante de pagamento ou a nota assinada.
+                </p>
+              </div>
             </div>
           )}
 
@@ -676,7 +775,7 @@ function StopCard({
             <Button
               disabled={
                 run.isPending ||
-                (action === "deliver" && !file) ||
+                (action === "deliver" && (!file || splitInvalid)) ||
                 (action === "schedule" && !date)
               }
               onClick={() => run.mutate()}
