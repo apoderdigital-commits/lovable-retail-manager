@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { KeyRound, RefreshCw, Lock, Check, Link2, MessageCircle } from "lucide-react";
+import { KeyRound, RefreshCw, Lock, Check, Link2, MessageCircle, Tags } from "lucide-react";
+import { MultiSelect } from "@/components/ui/multi-select";
 import { toast } from "sonner";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
@@ -39,6 +40,7 @@ type Offer = {
   active: boolean;
   created_at: string;
   repurchase_days: number | null;
+  category_ids: string[] | null;
 };
 
 /** types.ts ainda não conhece as tabelas/funções novas do CRM (mesma migração do repurchase_days). */
@@ -192,6 +194,27 @@ function SettingsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const { data: categories = [] } = useQuery({
+    queryKey: ["product-categories"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("product_categories").select("*").order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // quais linhas (categorias) entram em cada oferta; vazio = qualquer produto
+  const updateOfferCategories = useMutation({
+    mutationFn: async ({ offerId, ids }: { offerId: string; ids: string[] }) => {
+      const { error } = await db.from("offers").update({ category_ids: ids }).eq("id", offerId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["offers"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const updateRepurchaseDays = useMutation({
     mutationFn: async ({ offerId, days }: { offerId: string; days: number | null }) => {
       const { error } = await db.from("offers").update({ repurchase_days: days }).eq("id", offerId);
@@ -318,6 +341,34 @@ function SettingsPage() {
               </p>
             </div>
           )}
+        </section>
+
+        <section className="panel p-4 lg:col-span-2">
+          <div className="mb-1 flex items-center gap-2">
+            <Tags className="size-4 text-muted-foreground" />
+            <h2 className="text-sm font-semibold">Linhas de cada oferta</h2>
+          </div>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Só produtos dessas categorias formam o kit da oferta; o resto do carrinho é cobrado
+            normal. Sem categoria marcada, qualquer produto entra (o sistema usa os mais baratos).
+          </p>
+          <div className="space-y-2">
+            {offers
+              .filter((o) => o.active)
+              .map((o) => (
+                <div key={o.id} className="flex flex-wrap items-center gap-3">
+                  <span className="min-w-32 text-sm font-medium">{o.name}</span>
+                  <MultiSelect
+                    options={categories.map((c) => ({ value: c.id, label: c.name }))}
+                    selected={o.category_ids ?? []}
+                    onChange={(ids) => updateOfferCategories.mutate({ offerId: o.id, ids })}
+                    placeholder="Qualquer produto"
+                    allLabel="Qualquer produto"
+                    icon={<Tags className="size-3.5" />}
+                  />
+                </div>
+              ))}
+          </div>
         </section>
 
         <section className="panel p-4 lg:col-span-2">

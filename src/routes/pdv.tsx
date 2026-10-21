@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { applyOffers } from "@/lib/offers";
 import {
   Select,
   SelectContent,
@@ -177,14 +178,25 @@ function PdvPage() {
 
   const subtotal = lines.reduce((s, l) => s + l.unit * l.quantity, 0);
 
-  // a oferta vale pela quantidade de itens (10 frascos = "10 por R$ 200"),
-  // em venda orgânica ou de tráfego. Só entra quando sai mais barato que a
-  // tabela do cliente — atacado já pode estar abaixo do preço da oferta.
-  const matchedOffer =
-    cart.length > 0
-      ? offers.find((o) => o.item_count === units && Number(o.price) <= subtotal + 0.005)
-      : undefined;
-  const base = matchedOffer ? Number(matchedOffer.price) : subtotal;
+  // kits de oferta montados dentro do carrinho: 10 da linha viram "10 por
+  // R$ 200" e o que sobra é cobrado normal (mesma regra do banco)
+  const offerCalc = applyOffers(
+    lines.map((l) => ({
+      productId: l.productId,
+      quantity: l.quantity,
+      unit: l.unit,
+      categoryId: l.product.category_id ?? null,
+    })),
+    offers.map((o) => ({
+      id: o.id,
+      name: o.name,
+      item_count: o.item_count,
+      price: Number(o.price),
+      category_ids: (o as { category_ids?: string[] | null }).category_ids ?? [],
+    })),
+  );
+  const matchedOffer = offerCalc.applied[0]?.offer;
+  const base = offerCalc.total;
   const discountValue = Math.min(Number(discount || 0), base);
 
   // taxa de entrega: a cotação vem da mesma função que o banco usa ao criar
@@ -450,9 +462,13 @@ function PdvPage() {
             </div>
             {matchedOffer ? (
               <p className="mt-2 text-xs text-success">
-                Oferta <strong>{matchedOffer.name}</strong> aplicada — {units} item(ns) por{" "}
-                {brl(Number(matchedOffer.price))}
-                {origin === "traffic" ? ", venda de tráfego." : ", venda orgânica."}
+                Oferta aplicada:{" "}
+                <strong>
+                  {offerCalc.applied
+                    .map((a) => (a.bundles > 1 ? `${a.bundles}× ${a.offer.name}` : a.offer.name))
+                    .join(" + ")}
+                </strong>
+                {origin === "traffic" ? " · venda de tráfego." : " · venda orgânica."}
               </p>
             ) : origin === "traffic" ? (
               <p className="mt-2 text-xs text-muted-foreground">
@@ -626,14 +642,17 @@ function PdvPage() {
               </div>
               <div className="flex justify-between text-muted-foreground">
                 <span>Subtotal</span>
-                <span className={matchedOffer ? "line-through" : undefined}>{brl(subtotal)}</span>
+                <span>{brl(subtotal)}</span>
               </div>
-              {matchedOffer && (
-                <div className="flex justify-between text-success">
-                  <span>{matchedOffer.name}</span>
-                  <span>{brl(base)}</span>
+              {offerCalc.applied.map((a) => (
+                <div key={a.offer.id} className="flex justify-between text-success">
+                  <span>
+                    {a.bundles > 1 ? `${a.bundles}× ` : ""}
+                    {a.offer.name}
+                  </span>
+                  <span>-{brl(a.regular - a.charged)}</span>
                 </div>
-              )}
+              ))}
               <div className="flex justify-between text-muted-foreground">
                 <span>Desconto</span>
                 <span>-{brl(discountValue)}</span>
