@@ -289,7 +289,7 @@ function CourierPage() {
     onSuccess: (r) => {
       toast.success(
         `Rota encerrada. ${r["delivered"]} entregue(s) · taxa ${brl(Number(r["fee_payable"]))} · ` +
-          `dinheiro a acertar ${brl(Number(r["cash_in_hand"]))}`,
+          `a acertar (espécie + pix na sua chave) ${brl(Number(r["cash_in_hand"]))}`,
         { duration: 12000 },
       );
       qc.invalidateQueries({ queryKey: ["my-route-header"] });
@@ -340,8 +340,8 @@ function CourierPage() {
           </div>
           <div className="panel col-span-2 flex items-baseline justify-between p-3">
             <div>
-              <p className="text-xs text-muted-foreground">Dinheiro para acertar</p>
-              <p className="text-xs text-muted-foreground">recebido em espécie</p>
+              <p className="text-xs text-muted-foreground">A acertar com a loja</p>
+              <p className="text-xs text-muted-foreground">espécie + pix na sua chave</p>
             </div>
             <p className="font-display text-xl font-semibold">{brl(dia.especie)}</p>
           </div>
@@ -455,6 +455,7 @@ type Stop = {
   payment_method: string;
   payment_method_2: string | null;
   payment_amount_2: number;
+  pix_to?: "maquina" | "entregador" | null;
   delivery_address: string | null;
   neighborhood: string | null;
   city: string | null;
@@ -492,10 +493,15 @@ function StopCard({
   );
   const value2 = Number(amount2.replace(",", ".") || 0);
   const splitInvalid = split && (pay2 === pay1 || value2 <= 0 || value2 >= total);
+  // pix: caiu na máquina (loja) ou na chave do entregador (entra no acerto)
+  const hasPix = pay1 === "pix" || (split && pay2 === "pix");
+  const [pixTo, setPixTo] = useState<"maquina" | "entregador" | "">(stop.pix_to ?? "");
+  const pixMissing = hasPix && !pixTo;
   const paymentChanged =
     pay1 !== stop.payment_method ||
     (split ? pay2 : null) !== (stop.payment_method_2 ?? null) ||
-    (split ? value2 : 0) !== Number(stop.payment_amount_2 ?? 0);
+    (split ? value2 : 0) !== Number(stop.payment_amount_2 ?? 0) ||
+    (hasPix ? pixTo : null) !== (stop.pix_to ?? null);
 
   const run = useMutation({
     mutationFn: async () => {
@@ -503,12 +509,14 @@ function StopCard({
         if (!file) throw new Error("Envie a foto do comprovante");
         if (!user) throw new Error("Sessão expirada");
         if (splitInvalid) throw new Error("Confira as duas formas de pagamento");
+        if (pixMissing) throw new Error("Informe onde o pix caiu");
         if (paymentChanged) {
           const { error: payErr } = await supabase.rpc("set_delivery_payment" as never, {
             p_sale: stop.id,
             p_method: pay1,
             p_method_2: split ? pay2 : null,
             p_amount_2: split ? value2 : 0,
+            p_pix_to: hasPix ? pixTo : null,
           } as never);
           if (payErr) throw payErr;
         }
@@ -710,6 +718,31 @@ function StopCard({
                     )}
                   </div>
                 )}
+
+                {hasPix && (
+                  <div className="space-y-1.5 rounded-md border border-border p-3">
+                    <Label>Onde o pix caiu?</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        type="button"
+                        variant={pixTo === "maquina" ? "default" : "outline"}
+                        onClick={() => setPixTo("maquina")}
+                      >
+                        Pix máquina
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={pixTo === "entregador" ? "default" : "outline"}
+                        onClick={() => setPixTo("entregador")}
+                      >
+                        Pix entregador
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Pix na sua chave entra no acerto com a loja, junto com o dinheiro.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -772,7 +805,7 @@ function StopCard({
             <Button
               disabled={
                 run.isPending ||
-                (action === "deliver" && (!file || splitInvalid)) ||
+                (action === "deliver" && (!file || splitInvalid || pixMissing)) ||
                 (action === "schedule" && !date)
               }
               onClick={() => run.mutate()}

@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import {
+  ArrowLeftRight,
   Ban,
   Banknote,
   CreditCard,
@@ -46,6 +47,7 @@ import {
   todayISO,
 } from "@/lib/format";
 import { ReceiptSheet } from "@/components/receipt/ReceiptSheet";
+import { ExchangeDialog, type ExchangeSale } from "@/components/exchange-dialog";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -89,6 +91,7 @@ function SalesHistoryPage() {
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [printingId, setPrintingId] = useState<string | null>(null);
+  const [exchanging, setExchanging] = useState<ExchangeSale | null>(null);
 
   // sem filtro de dia: últimas 300, pra navegação rápida do dia a dia. Com
   // dia marcado, busca o dia inteiro sem limite — senão um dia antigo
@@ -126,6 +129,40 @@ function SalesHistoryPage() {
       if (error) throw error;
       const map = new Map<string, number>();
       for (const row of data) map.set(row.sale_id, (map.get(row.sale_id) ?? 0) + 1);
+      return map;
+    },
+  });
+
+  // trocas já feitas, pra marcar a venda e mostrar o registro no hover
+  const { data: exchanges = new Map<string, string[]>() } = useQuery({
+    queryKey: ["sale-exchanges", saleIds],
+    enabled: saleIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("sale_exchanges" as never)
+        .select("sale_id, kind, returned_name, returned_qty, given_name, given_qty, difference, created_at")
+        .in("sale_id", saleIds)
+        .order("created_at");
+      if (error) throw error;
+      const KIND: Record<string, string> = { troca: "Troca", defeito: "Defeito", fragrancia: "Fragrância" };
+      const map = new Map<string, string[]>();
+      for (const e of (data ?? []) as {
+        sale_id: string;
+        kind: string;
+        returned_name: string;
+        returned_qty: number;
+        given_name: string;
+        given_qty: number;
+        difference: number;
+        created_at: string;
+      }[]) {
+        const diff = Number(e.difference);
+        const line =
+          `${dateTime(e.created_at)} · ${KIND[e.kind] ?? e.kind}: ` +
+          `${e.returned_qty}x ${e.returned_name} → ${e.given_qty}x ${e.given_name}` +
+          (diff > 0 ? ` (cliente pagou ${brl(diff)})` : diff < 0 ? ` (loja devolveu ${brl(-diff)})` : "");
+        map.set(e.sale_id, [...(map.get(e.sale_id) ?? []), line]);
+      }
       return map;
     },
   });
@@ -292,6 +329,15 @@ function SalesHistoryPage() {
                         Cancelada
                       </Badge>
                     )}
+                    {exchanges.has(s.id) && (
+                      <Badge
+                        variant="secondary"
+                        className="ml-2 align-middle text-[10px]"
+                        title={exchanges.get(s.id)!.join("\n")}
+                      >
+                        Troca
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell className="text-muted-foreground">{dateTime(s.created_at)}</TableCell>
                   <TableCell>
@@ -339,6 +385,16 @@ function SalesHistoryPage() {
                       <Button variant="ghost" size="icon" onClick={() => setPrintingId(s.id)}>
                         <Printer className="size-4" />
                       </Button>
+                      {s.status === "delivered" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Registrar troca"
+                          onClick={() => setExchanging(s)}
+                        >
+                          <ArrowLeftRight className="size-4" />
+                        </Button>
+                      )}
                       {podeCancel && (
                         <Button variant="ghost" size="icon" onClick={() => setCancelling(s.id)}>
                           <Ban className="size-4 text-destructive" />
@@ -394,6 +450,7 @@ function SalesHistoryPage() {
       </Dialog>
 
       <ReceiptSheet saleId={printingId} onClose={() => setPrintingId(null)} />
+      <ExchangeDialog sale={exchanging} onClose={() => setExchanging(null)} />
     </AppShell>
   );
 }

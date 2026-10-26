@@ -3,7 +3,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { useReactToPrint } from "react-to-print";
-import { Wallet, Landmark, CreditCard, Receipt, Printer } from "lucide-react";
+import { Wallet, Landmark, CreditCard, Receipt, Printer, Smartphone, HandCoins } from "lucide-react";
+import { DeliveryProofs } from "@/components/delivery-proofs";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell, Metric } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -55,8 +56,12 @@ type PaymentBreakdown = {
 // dinheiro, pix e boleto entram como estão; débito e crédito viram "Cartão"
 // porque pra quem confere a rua no fim do dia o que importa é se caiu na
 // maquininha ou não — a bandeira específica não muda o acerto.
+// pix se divide pelo destino: máquina caiu na loja, entregador caiu na
+// chave dele e entra no acerto. "pix" puro é venda antiga, sem destino.
 const CATEGORY: Record<string, string> = {
-  pix: "Pix",
+  "pix máquina": "Pix máquina",
+  "pix entregador": "Pix entregador",
+  pix: "Pix sem destino",
   dinheiro: "Espécie",
   "débito": "Cartão",
   "crédito": "Cartão",
@@ -113,9 +118,9 @@ function DeliveriesDashboardPage() {
     return c?.full_name || c?.email || "—";
   };
 
-  // extrato imprime todo mundo junto, independente do motoboy selecionado
-  // no filtro acima — é o resumo pra loja acertar com todos de uma vez
-  const statements: CourierStatementData[] = range.map((r) => {
+  // um extrato por motoboy. "Todos juntos" imprime todos em sequência; com
+  // um motoboy selecionado, imprime só o dele
+  const allStatements: CourierStatementData[] = range.map((r) => {
     const meus = payments.filter((p) => p.courier_id === r.courier_id);
     return {
       courierId: r.courier_id,
@@ -129,8 +134,11 @@ function DeliveriesDashboardPage() {
         amount: Number(p.amount),
       })),
       apurado: meus.reduce((s, p) => s + Number(p.amount), 0),
+      toSettle: Number(r.cash_collected),
     };
   });
+  const statements =
+    courierId === "all" ? allStatements : allStatements.filter((s) => s.courierId === courierId);
 
   const { settings: printSettings } = usePrintSettings();
   const statementPaperWidth = printSettings.printerType === "thermal" ? printSettings.paperWidth : "auto";
@@ -152,8 +160,9 @@ function DeliveriesDashboardPage() {
       delivered: acc.delivered + Number(r.delivered),
       notDelivered: acc.notDelivered + Number(r.not_delivered),
       fee: acc.fee + Number(r.fee_payable),
+      toSettle: acc.toSettle + Number(r.cash_collected),
     }),
-    { delivered: 0, notDelivered: 0, fee: 0 },
+    { delivered: 0, notDelivered: 0, fee: 0, toSettle: 0 },
   );
 
   const byCategory = visiblePayments.reduce<Record<string, { amount: number; transactions: number }>>(
@@ -169,9 +178,18 @@ function DeliveriesDashboardPage() {
     {},
   );
   const apurado = Object.values(byCategory).reduce((s, c) => s + c.amount, 0);
-  const CATEGORIES = ["Pix", "Espécie", "Cartão", ...(byCategory["Outros"] ? ["Outros"] : [])];
+  const CATEGORIES = [
+    "Pix máquina",
+    "Pix entregador",
+    "Espécie",
+    "Cartão",
+    ...(byCategory["Pix sem destino"] ? ["Pix sem destino"] : []),
+    ...(byCategory["Outros"] ? ["Outros"] : []),
+  ];
   const CATEGORY_ICON: Record<string, typeof Wallet> = {
-    Pix: Landmark,
+    "Pix máquina": Landmark,
+    "Pix entregador": Smartphone,
+    "Pix sem destino": Landmark,
     Espécie: Wallet,
     Cartão: CreditCard,
     Outros: Receipt,
@@ -213,12 +231,13 @@ function DeliveriesDashboardPage() {
             disabled={statements.length === 0}
             onClick={() => printStatements()}
           >
-            <Printer className="mr-2 size-4" /> Imprimir extratos
+            <Printer className="mr-2 size-4" />
+            {courierId === "all" ? "Imprimir extratos" : "Imprimir extrato"}
           </Button>
         </div>
       }
     >
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Metric label="Entregues" value={String(totals.delivered)} />
         <Metric
           label="Não entregues"
@@ -227,6 +246,11 @@ function DeliveriesDashboardPage() {
         />
         <Metric label="Taxa de entrega a pagar" value={brl(totals.fee)} tone="accent" />
         <Metric label="Total apurado" value={brl(apurado)} hint="todas as formas de pagamento" />
+        <Metric
+          label="A acertar"
+          value={brl(totals.toSettle)}
+          hint="espécie + pix entregador, na mão do motoboy"
+        />
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -247,50 +271,55 @@ function DeliveriesDashboardPage() {
         })}
       </div>
 
-      {courierId === "all" && (
-        <section className="panel mt-4">
-          <header className="border-b border-border px-4 py-3">
-            <h2 className="text-sm font-semibold">Por motoboy</h2>
-          </header>
-          <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
-            {range.map((r) => {
-              const meus = payments.filter((p) => p.courier_id === r.courier_id);
-              const meuApurado = meus.reduce((s, p) => s + Number(p.amount), 0);
-              return (
-                <div key={r.courier_id} className="rounded-lg border border-border p-3">
-                  <p className="text-sm font-semibold">{nameOf(r.courier_id)}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {r.delivered} entregue(s) · {r.not_delivered} não entregue(s) · taxa{" "}
-                    {brl(Number(r.fee_payable))}
-                  </p>
-                  <div className="mt-2 space-y-1">
-                    {meus.map((p) => (
-                      <div key={p.payment_method} className="flex justify-between text-xs">
-                        <span className="capitalize text-muted-foreground">
-                          {p.payment_method} · {p.transactions}x
-                        </span>
-                        <span className="font-medium">{brl(Number(p.amount))}</span>
-                      </div>
-                    ))}
-                    {meus.length === 0 && (
-                      <p className="text-xs text-muted-foreground">Sem entregas no período.</p>
-                    )}
-                  </div>
-                  <div className="mt-2 flex justify-between border-t border-border pt-1.5 text-xs font-semibold">
-                    <span>Apurado</span>
-                    <span>{brl(meuApurado)}</span>
-                  </div>
-                </div>
-              );
-            })}
-            {range.length === 0 && (
-              <p className="col-span-full py-6 text-center text-sm text-muted-foreground">
-                Nenhum motoboy com rota no período.
+      <section className="panel mt-4">
+        <header className="border-b border-border px-4 py-3">
+          <h2 className="text-sm font-semibold">
+            {courierId === "all" ? "Extrato por motoboy" : `Extrato de ${nameOf(courierId)}`}
+          </h2>
+        </header>
+        <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
+          {statements.map((s) => (
+            <div key={s.courierId} className="rounded-lg border border-border p-3">
+              <p className="text-sm font-semibold">{s.name}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {s.delivered} entregue(s) · {s.notDelivered} não entregue(s) · taxa {brl(s.fee)}
               </p>
-            )}
-          </div>
-        </section>
-      )}
+              <div className="mt-2 space-y-1">
+                {s.payments.map((p) => (
+                  <div key={p.method} className="flex justify-between text-xs">
+                    <span className="capitalize text-muted-foreground">
+                      {p.method} · {p.transactions}x
+                    </span>
+                    <span className="font-medium">{brl(p.amount)}</span>
+                  </div>
+                ))}
+                {s.payments.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Sem entregas no período.</p>
+                )}
+              </div>
+              <div className="mt-2 flex justify-between border-t border-border pt-1.5 text-xs font-semibold">
+                <span>Apurado</span>
+                <span>{brl(s.apurado)}</span>
+              </div>
+              <div className="mt-1 flex items-center justify-between text-xs font-semibold text-accent">
+                <span className="inline-flex items-center gap-1">
+                  <HandCoins className="size-3.5" /> A acertar
+                </span>
+                <span>{brl(s.toSettle)}</span>
+              </div>
+            </div>
+          ))}
+          {statements.length === 0 && (
+            <p className="col-span-full py-6 text-center text-sm text-muted-foreground">
+              {courierId === "all"
+                ? "Nenhum motoboy com rota no período."
+                : "Esse motoboy não teve rota no período."}
+            </p>
+          )}
+        </div>
+      </section>
+
+      <DeliveryProofs courierId={courierId === "all" ? null : courierId} from={from} to={to} nameOf={nameOf} />
 
       <div style={{ position: "fixed", left: "-9999px", top: 0 }}>
         <CourierStatementPrint

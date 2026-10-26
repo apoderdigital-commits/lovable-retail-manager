@@ -9,6 +9,8 @@ export type CourierStatementData = {
   fee: number;
   payments: { method: string; transactions: number; amount: number }[];
   apurado: number;
+  // espécie + pix na chave do motoboy: o que ele repassa pra loja
+  toSettle: number;
 };
 
 const dateBr = dayBr;
@@ -89,6 +91,11 @@ export const CourierStatementPrint = forwardRef<
             <span>Apurado</span>
             <span>{brl(c.apurado)}</span>
           </div>
+          <div className="flex justify-between font-bold">
+            <span>A acertar</span>
+            <span>{brl(c.toSettle)}</span>
+          </div>
+          <p className="text-[10px]">espécie + pix entregador</p>
         </div>
       ))}
     </div>
