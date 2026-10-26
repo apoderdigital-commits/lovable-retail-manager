@@ -94,13 +94,16 @@ function SalesHistoryPage() {
   // dia marcado, busca o dia inteiro sem limite — senão um dia antigo
   // podia sumir da lista só por estar fora das 300 mais recentes.
   const { data: sales = [], isLoading } = useQuery({
-    queryKey: ["sales-history", day, onlyMine],
+    queryKey: ["sales-history", day, onlyMine, sellerFilter],
     queryFn: async () => {
       let q = supabase
         .from("sales")
         .select("*, customers(name, phone, customer_type)")
         .order("created_at", { ascending: false });
       if (onlyMine) q = q.eq("seller_id", onlyMine);
+      // vendedor filtrado vai pro banco: as 300 passam a ser só dele, senão o
+      // resumo do mês dele saía cortado pelas vendas dos outros
+      else if (sellerFilter.length > 0) q = q.in("seller_id", sellerFilter);
       q = day
         ? q.gte("created_at", dayStart(day)).lte("created_at", dayEnd(day))
         : q.limit(300);
@@ -168,10 +171,11 @@ function SalesHistoryPage() {
     label: p.full_name || p.email || "—",
   }));
 
+  const bySeller = (s: (typeof sales)[number]) =>
+    sellerFilter.length === 0 || (!!s.seller_id && sellerFilter.includes(s.seller_id));
+
   const filtered = sales.filter((s) => {
-    if (sellerFilter.length > 0 && !(s.seller_id && sellerFilter.includes(s.seller_id))) {
-      return false;
-    }
+    if (!bySeller(s)) return false;
     if (!term.trim()) return true;
     const name = s.customers?.name ?? "";
     const phone = s.customers?.phone ?? "";
@@ -186,9 +190,10 @@ function SalesHistoryPage() {
     const weekStart = at(weekStartISO(today));
     const monthStart = at(monthStartISO());
 
+    // resumo segue o filtro de vendedor (não a busca por cliente)
     const bucket = (from: Date, to: Date) => {
       const list = sales.filter((s) => {
-        if (s.status === "cancelled") return false;
+        if (s.status === "cancelled" || !bySeller(s)) return false;
         const t = new Date(s.created_at);
         return t >= from && t < to;
       });
@@ -201,7 +206,7 @@ function SalesHistoryPage() {
       semana: bucket(weekStart, tomorrowStart),
       mes: bucket(monthStart, tomorrowStart),
     };
-  }, [sales]);
+  }, [sales, sellerFilter]);
 
   return (
     <AppShell
