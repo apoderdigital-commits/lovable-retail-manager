@@ -35,7 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { brl, TZ, timeShort, todayISO } from "@/lib/format";
+import { brl, dayBr, TZ, timeShort, todayISO } from "@/lib/format";
 
 export const Route = createFileRoute("/entregas")({
   head: () => ({
@@ -122,7 +122,9 @@ function DeliveriesPage() {
       const { data, error } = await supabase
         .from("sales")
         .select("*, customers(name, customer_type)")
-        .in("status", ["picked", "scheduled", "on_route"])
+        // not_delivered entra: o pedido que o motoboy não conseguiu entregar
+        // precisa aparecer aqui pra voltar pra fila, senão ele "some"
+        .in("status", ["picked", "scheduled", "on_route", "not_delivered"])
         .order("created_at");
       if (error) throw error;
       return data;
@@ -150,8 +152,13 @@ function DeliveriesPage() {
       : Number(fees.find((f) => f.neighborhood === o.neighborhood)?.amount ?? 0);
 
   const queue = orders.filter((o) => o.status === "picked" && !o.route_id);
-  const scheduledToday = orders.filter(
-    (o) => o.status === "scheduled" && o.scheduled_for && o.scheduled_for <= today,
+  // esperando a loja mandar de volta pra fila: agendado pra hoje (ou antes)
+  // e não entregue. Os dois guardam a rota antiga, por isso não entram em
+  // `queue` nem em `stopsOf` até alguém clicar em "Pra fila".
+  const waiting = orders.filter(
+    (o) =>
+      o.status === "not_delivered" ||
+      (o.status === "scheduled" && o.scheduled_for && o.scheduled_for <= today),
   );
 
   const invalidate = () => {
@@ -234,7 +241,11 @@ function DeliveriesPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const stopsOf = (routeId: string) => orders.filter((o) => o.route_id === routeId);
+  const stopsOf = (routeId: string) =>
+    orders.filter((o) => o.route_id === routeId && o.status === "picked");
+
+  const addressLine = (o: { delivery_address: string | null; neighborhood: string | null }) =>
+    [o.delivery_address, o.neighborhood].filter(Boolean).join(" · ") || "sem endereço";
 
   return (
     <AppShell
@@ -253,20 +264,27 @@ function DeliveriesPage() {
         </div>
       )}
 
-      {scheduledToday.length > 0 && (
+      {waiting.length > 0 && (
         <div className="panel mb-4 border-warning/40 p-4">
           <div className="mb-2 flex items-center gap-2">
             <CalendarClock className="size-4 text-warning" />
             <p className="text-sm font-medium">
-              {scheduledToday.length} pedido(s) agendado(s) para hoje ou antes
+              {waiting.length} pedido(s) esperando voltar pra fila
             </p>
           </div>
           <div className="space-y-1.5">
-            {scheduledToday.map((o) => (
+            {waiting.map((o) => (
               <div key={o.id} className="flex items-center gap-2 text-sm">
-                <span className="flex-1 truncate">
-                  #{o.sale_number} {o.customers?.name} · {o.neighborhood ?? "sem bairro"}
-                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate">
+                    #{o.sale_number} {o.customers?.name} · {addressLine(o)}
+                  </p>
+                  <p className="truncate text-xs text-warning">
+                    {o.status === "not_delivered"
+                      ? `Não entregue${o.reason ? `: ${o.reason}` : ""}`
+                      : `Agendado para ${o.scheduled_for ? dayBr(o.scheduled_for) : "hoje"}`}
+                  </p>
+                </div>
                 <Button size="sm" variant="outline" onClick={() => backToQueue.mutate(o.id)}>
                   <Undo2 className="mr-1.5 size-3.5" /> Pra fila
                 </Button>
@@ -307,10 +325,13 @@ function DeliveriesPage() {
                     )}
                   </div>
                 </div>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {o.neighborhood ?? "sem bairro"} · {o.payment_method}
+                <p className="mt-0.5 text-xs text-muted-foreground">{addressLine(o)}</p>
+                <p className="mt-1 text-sm font-medium">
+                  {brl(Number(o.total))}
+                  <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                    {o.payment_method}
+                  </span>
                 </p>
-                <p className="mt-1 text-sm font-medium">{brl(Number(o.total))}</p>
                 <Select
                   disabled={couriers.length === 0 || assign.isPending}
                   onValueChange={(courierId) => assign.mutate({ saleId: o.id, courierId })}
@@ -373,9 +394,7 @@ function DeliveriesPage() {
                       <span className="text-xs text-muted-foreground">{idx + 1}</span>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm">{o.customers?.name ?? "—"}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {o.neighborhood ?? "sem bairro"}
-                        </p>
+                        <p className="truncate text-xs text-muted-foreground">{addressLine(o)}</p>
                       </div>
                       <Badge variant="secondary" className="shrink-0 text-[10px]">
                         #{o.sale_number}

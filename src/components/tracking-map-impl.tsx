@@ -54,7 +54,8 @@ export function TrackingMap({
   const withPosition = useMemo(() => couriers.filter((c) => c.lat !== null && c.lng !== null), [couriers]);
 
   return (
-    <MapContainer center={[-23.55, -46.63]} zoom={12} style={{ height: "100%", width: "100%" }}>
+    // abre em Recife enquanto nenhum entregador mandou posição
+    <MapContainer center={[-8.05, -34.9]} zoom={12} style={{ height: "100%", width: "100%" }}>
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

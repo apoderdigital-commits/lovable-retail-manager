@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/select";
 import { brl } from "@/lib/format";
 import { MultiSelect } from "@/components/ui/multi-select";
-import { CustomerPicker } from "@/components/customer-picker";
+import { CustomerPicker, type CreatedCustomer } from "@/components/customer-picker";
 import { ReceiptSheet } from "@/components/receipt/ReceiptSheet";
 
 export const Route = createFileRoute("/pdv")({
@@ -150,9 +150,11 @@ function PdvPage() {
   const priceOf = (p: (typeof products)[number]) =>
     Number(isWholesale ? p.wholesale_price : p.price);
 
-  const selectCustomer = (id: string) => {
+  // `created` vem do cadastro rápido: o cliente novo ainda não está em
+  // `customers`, e sem isso o endereço dele ficava em branco no pedido
+  const selectCustomer = (id: string, created?: CreatedCustomer) => {
     setCustomerId(id);
-    const c = customers.find((x) => x.id === id);
+    const c = created ?? customers.find((x) => x.id === id);
     setAddress(c?.address ?? "");
     setNeighborhood(c?.neighborhood ?? "");
     setCity(c?.city ?? "");
@@ -302,7 +304,8 @@ function PdvPage() {
   });
 
   const missingCustomer = mode === "delivery" && customerId === "none";
-  const missingAddress = mode === "delivery" && !address.trim();
+  // bairro obrigatório: é ele que define a taxa e é o que a fila mostra
+  const missingAddress = mode === "delivery" && (!address.trim() || !neighborhood.trim());
   // sem cidade, cidade sem taxa cadastrada ou região que a loja não atende
   const feeBlocked =
     mode === "delivery" && (!city.trim() || quoting || !quote || !quote.serves);
@@ -561,7 +564,9 @@ function PdvPage() {
                   <Input value={address} onChange={(e) => setAddress(e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Bairro</Label>
+                  <Label>
+                    Bairro <span className="text-destructive">*</span>
+                  </Label>
                   <Input value={neighborhood} onChange={(e) => setNeighborhood(e.target.value)} />
                 </div>
                 <div className="space-y-1.5">

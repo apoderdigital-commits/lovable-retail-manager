@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MapContainer, TileLayer, Marker, Polyline, useMap, useMapEvents } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Polyline, Circle, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { keepAwakeOn, keepAwakeOff } from "@/lib/keep-awake";
@@ -22,10 +22,21 @@ export type MapStop = {
   id: string;
   index: number;
   label: string;
+  // texto completo (rua, bairro, cidade): é a chave do cache
   address: string;
+  // as partes separadas vão pra busca estruturada, que acerta mais
+  street: string | null;
+  neighborhood: string | null;
+  city: string | null;
 };
 
 type Point = { lat: number; lng: number };
+
+// precisão do pino: exato = casa/número achado; rua = só a rua, sem o
+// número; bairro = centro do bairro. O entregador precisa saber a diferença,
+// senão um pino no meio do bairro parece a porta do cliente.
+type Precision = "exato" | "rua" | "bairro";
+type Located = Point & { precision: Precision };
 
 // mapa do OpenStreetMap, que não exige chave (o da CARTO passou a exigir e
 // cobria o mapa de "API KEY REQUIRED"). A classe map-clean, em styles.css,
@@ -54,15 +65,16 @@ const fmtMin = (s: number) => `${Math.max(1, Math.round(s / 60))} min`;
 // política de uso: no máximo 1 consulta por segundo. O resultado fica
 // guardado no aparelho, então o mesmo endereço não é consultado de novo.
 
-// v2: a v1 aceitava resultado fora da Grande Recife e pode ter guardado
-// endereço no lugar errado
-const CACHE_KEY = "courier-geocode-v2";
+// v3: guarda só o que foi achado, com a precisão. A v2 gravava "não
+// encontrado" pra sempre, inclusive quando era só a rede que falhou, e
+// guardava o centro do bairro como se fosse a casa.
+const CACHE_KEY = "courier-geocode-v3";
 
 // a loja só entrega na Grande Recife (Igarassu ao Cabo): a busca fica
 // presa nessa área, senão "Casa Caiada" ou "Centro" podem cair em outro estado
 const AREA = "viewbox=-35.35,-7.55,-34.80,-8.45&bounded=1";
 
-function readCache(): Record<string, Point | null> {
+function readCache(): Record<string, Located> {
   try {
     return JSON.parse(localStorage.getItem(CACHE_KEY) ?? "{}");
   } catch {
@@ -70,7 +82,7 @@ function readCache(): Record<string, Point | null> {
   }
 }
 
-function writeCache(cache: Record<string, Point | null>) {
+function writeCache(cache: Record<string, Located>) {
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
   } catch {
@@ -78,51 +90,116 @@ function writeCache(cache: Record<string, Point | null>) {
   }
 }
 
-async function search(q: string): Promise<Point | null> {
-  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&${AREA}&q=${encodeURIComponent(q)}`;
-  const res = await fetch(url, { headers: { "Accept-Language": "pt-BR" } });
-  if (!res.ok) return null;
-  const data = (await res.json()) as { lat: string; lon: string }[];
-  const hit = data[0];
-  return hit ? { lat: Number(hit.lat), lng: Number(hit.lon) } : null;
+// abreviações que o Nominatim nem sempre entende
+const ABBREV: [RegExp, string][] = [
+  [/^r\.?\s+/i, "Rua "],
+  [/^av\.?\s+/i, "Avenida "],
+  [/^tv\.?\s+|^trav\.?\s+/i, "Travessa "],
+  [/^est\.?\s+/i, "Estrada "],
+  [/^al\.?\s+/i, "Alameda "],
+  [/^p[çc]a?\.?\s+/i, "Praça "],
+  [/^rod\.?\s+/i, "Rodovia "],
+];
+
+// "Rua Foo, nº 123 - Apt 302, Bloco B" -> { street: "Rua Foo", number: "123" }
+// O complemento (apto, bloco, casa, fundos...) derruba a busca, então fica
+// tudo até o número. Número de rua ("Rua 15 de Novembro") não conta: é o
+// primeiro número que NÃO vem seguido de " de ".
+function splitStreet(raw: string): { street: string; number: string | null } {
+  let s = raw.trim().replace(/\s+/g, " ");
+  for (const [re, rep] of ABBREV) s = s.replace(re, rep);
+  s = s.replace(/\b(n[º°o]\.?|n[uú]m(?:ero)?\.?)\s*/gi, "");
+  const re = /\b(\d{1,5})\b(?!\s+de\s)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(s))) {
+    const street = s
+      .slice(0, m.index)
+      .replace(/[\s,\-–]+$/, "")
+      .trim();
+    if (street) return { street, number: m[1]! };
+  }
+  return { street: s.replace(/\b(s\/n|sn)\b.*$/i, "").replace(/[\s,\-–]+$/, "").trim(), number: null };
 }
 
-// endereço completo primeiro; se a rua não for conhecida, cai pro bairro +
-// cidade, que pelo menos põe o pino na região certa
-async function geocode(address: string): Promise<Point | null> {
-  const full = await search(address);
-  if (full) return full;
-  const parts = address.split(",").map((p) => p.trim());
-  if (parts.length < 3) return null;
-  await sleep(1100);
-  return search(parts.slice(-2).join(", "));
+type Hit = {
+  lat: string;
+  lon: string;
+  address?: { house_number?: string; road?: string; pedestrian?: string; residential?: string };
+};
+
+// um pedido ao Nominatim. Erro de rede ou de servidor (429, 5xx) sobe como
+// exceção: é "não deu pra consultar", não "não existe"
+async function query(params: string): Promise<Located | null> {
+  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&countrycodes=br&${AREA}&${params}`;
+  const res = await fetch(url, { headers: { "Accept-Language": "pt-BR" } });
+  if (!res.ok) throw new Error(`nominatim ${res.status}`);
+  const hit = ((await res.json()) as Hit[])[0];
+  if (!hit) return null;
+  const a = hit.address ?? {};
+  const precision: Precision = a.house_number
+    ? "exato"
+    : a.road || a.pedestrian || a.residential
+      ? "rua"
+      : "bairro";
+  return { lat: Number(hit.lat), lng: Number(hit.lon), precision };
+}
+
+const enc = encodeURIComponent;
+
+// do mais preciso pro menos: rua+número estruturado, texto completo, só a
+// rua, e por fim bairro + cidade. Para no primeiro que achar; 1,1 s entre
+// consultas por causa da política de uso do Nominatim.
+async function geocode(stop: MapStop): Promise<Located | null> {
+  const city = stop.city?.trim() || "Recife";
+  const { street, number } = stop.street ? splitStreet(stop.street) : { street: "", number: null };
+  const attempts: string[] = [];
+  if (street && number) attempts.push(`street=${enc(`${number} ${street}`)}&city=${enc(city)}`);
+  attempts.push(`q=${enc(stop.address)}`);
+  if (street) attempts.push(`street=${enc(street)}&city=${enc(city)}`);
+  if (stop.neighborhood?.trim()) attempts.push(`q=${enc(`${stop.neighborhood.trim()}, ${city}`)}`);
+
+  for (const [i, params] of attempts.entries()) {
+    if (i > 0) await sleep(1100);
+    const hit = await query(params);
+    if (!hit) continue;
+    // a busca por bairro não pode "achar" uma casa: o pino é do bairro
+    if (i === attempts.length - 1 && stop.neighborhood?.trim()) return { ...hit, precision: "bairro" };
+    return hit;
+  }
+  return null;
 }
 
 function useGeocoded(stops: MapStop[]) {
-  const [points, setPoints] = useState<Record<string, Point | null>>(() => readCache());
+  // só o que foi achado vem do cache; "não achou" e "não consultou" ficam
+  // nesta sessão e são tentados de novo na próxima vez
+  const [points, setPoints] = useState<Record<string, Located | null>>(() => readCache());
+  const [failed, setFailed] = useState<Set<string>>(new Set());
   const [pending, setPending] = useState(0);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     let alive = true;
-    const missing = stops.filter((s) => !(s.address in points));
+    const missing = stops.filter((s) => !(s.address in points) && !failed.has(s.address));
     if (missing.length === 0) return;
     setPending(missing.length);
 
     (async () => {
-      const cache = readCache();
       for (const [i, s] of missing.entries()) {
         if (!alive) return;
         if (i > 0) await sleep(1100);
-        let p: Point | null = null;
         try {
-          p = await geocode(s.address);
+          const p = await geocode(s);
+          if (!alive) return;
+          if (p) {
+            const cache = readCache();
+            cache[s.address] = p;
+            writeCache(cache);
+          }
+          setPoints((prev) => ({ ...prev, [s.address]: p }));
         } catch {
-          p = null;
+          if (!alive) return;
+          setFailed((prev) => new Set(prev).add(s.address));
         }
-        cache[s.address] = p;
-        writeCache(cache);
-        if (!alive) return;
-        setPoints((prev) => ({ ...prev, [s.address]: p }));
         setPending((n) => n - 1);
       }
     })();
@@ -130,11 +207,16 @@ function useGeocoded(stops: MapStop[]) {
     return () => {
       alive = false;
     };
-    // só refaz quando muda o conjunto de endereços
+    // só refaz quando muda o conjunto de endereços ou o entregador pede
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stops.map((s) => s.address).join("|")]);
+  }, [stops.map((s) => s.address).join("|"), retry]);
 
-  return { points, pending };
+  const retryFailed = () => {
+    setFailed(new Set());
+    setRetry((n) => n + 1);
+  };
+
+  return { points, pending, failed, retryFailed };
 }
 
 
@@ -150,8 +232,12 @@ function bearing(a: Point, b: Point) {
   return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
 }
 
+// posição do aparelho com o raio de erro: antena de celular ou wi-fi dá
+// fix de centenas de metros, e a bolinha não pode fingir que é exata
+type MyPos = Point & { accuracy: number };
+
 function useMyPosition() {
-  const [pos, setPos] = useState<Point | null>(null);
+  const [pos, setPos] = useState<MyPos | null>(null);
   const [heading, setHeading] = useState(0);
   const [denied, setDenied] = useState(false);
   const last = useRef<Point | null>(null);
@@ -164,14 +250,16 @@ function useMyPosition() {
       (p) => {
         setDenied(false);
         const cur = { lat: p.coords.latitude, lng: p.coords.longitude };
-        // o GPS nem sempre informa a direção; aí calcula pelo deslocamento
+        const accuracy = p.coords.accuracy ?? 0;
+        // o GPS nem sempre informa a direção; aí calcula pelo deslocamento —
+        // mas só com fix bom, senão o salto de um fix ruim vira "direção"
         if (p.coords.heading !== null && !Number.isNaN(p.coords.heading)) {
           setHeading(p.coords.heading);
-        } else if (last.current && meters(last.current, cur) > 5) {
+        } else if (last.current && accuracy <= 50 && meters(last.current, cur) > 5) {
           setHeading(bearing(last.current, cur));
         }
         last.current = cur;
-        setPos(cur);
+        setPos({ ...cur, accuracy });
       },
       () => setDenied(true),
       { enableHighAccuracy: true, maximumAge: 3_000, timeout: 20_000 },
@@ -235,14 +323,19 @@ function instruction(step: Step | undefined): { text: string; icon: typeof Arrow
 
 // ---- ícones ----
 
-// o número gira ao contrário do mapa pra continuar de pé na tela
-const stopIcon = (n: number, active: boolean, mapRotation = 0) =>
-  L.divIcon({
+// o número gira ao contrário do mapa pra continuar de pé na tela.
+// pino aproximado (sem número ou só o bairro) sai laranja e tracejado.
+const stopIcon = (n: number, active: boolean, precision: Precision, mapRotation = 0) => {
+  const approx = precision !== "exato";
+  const bg = approx ? "#d97706" : active ? "#16a34a" : "#1e3a52";
+  const border = approx ? "2px dashed white" : "2px solid white";
+  return L.divIcon({
     className: "",
-    html: `<div style="width:${active ? 32 : 26}px;height:${active ? 32 : 26}px;border-radius:50%;background:${active ? "#16a34a" : "#1e3a52"};color:white;font:600 13px sans-serif;display:grid;place-items:center;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.35);transform:rotate(${mapRotation}deg)">${n}</div>`,
+    html: `<div style="width:${active ? 32 : 26}px;height:${active ? 32 : 26}px;border-radius:50%;background:${bg};color:white;font:600 13px sans-serif;display:grid;place-items:center;border:${border};box-shadow:0 1px 4px rgba(0,0,0,.35);transform:rotate(${mapRotation}deg)">${n}</div>`,
     iconSize: [active ? 32 : 26, active ? 32 : 26],
     iconAnchor: [active ? 16 : 13, active ? 16 : 13],
   });
+};
 
 // parado: bolinha azul. navegando: seta apontando pra onde o motoboy vai
 const meIcon = (navigating: boolean, heading: number) =>
@@ -318,7 +411,7 @@ export function CourierMap({
   stops: MapStop[];
   onOpenStops?: () => void;
 }) {
-  const { points, pending } = useGeocoded(stops);
+  const { points, pending, failed, retryFailed } = useGeocoded(stops);
   const { pos, heading, denied } = useMyPosition();
   const [navigating, setNavigating] = useState(false);
   const [follow, setFollow] = useState(true);
@@ -361,6 +454,8 @@ export function CourierMap({
 
   const next = located[0] ?? null;
   const notFound = stops.filter((s) => points[s.address] === null);
+  const approximate = located.filter((s) => s.precision !== "exato");
+  const unreachable = stops.filter((s) => failed.has(s.address));
 
   // visão geral: trajeto completo, da posição atual passando por todas as
   // paradas na ordem escolhida
@@ -403,7 +498,9 @@ export function CourierMap({
     setLeg(null);
   }, [next?.id]);
 
-  const arrived = navigating && pos && next ? meters(pos, next) < 50 : false;
+  // "chegou" só com fix decente: a 500 m de erro, 50 m não quer dizer nada
+  const arrived = navigating && pos && next ? meters(pos, next) < 50 && pos.accuracy <= 100 : false;
+  const badFix = pos ? pos.accuracy > 150 : false;
   const nextStep = leg?.steps[1];
   const toNextTurn = leg?.steps[0]?.distance ?? 0;
   const instr = instruction(nextStep);
@@ -472,9 +569,17 @@ export function CourierMap({
             <Marker
               key={s.id}
               position={[s.lat, s.lng]}
-              icon={stopIcon(s.index, i === 0, rotating ? rot : 0)}
+              icon={stopIcon(s.index, i === 0, s.precision, rotating ? rot : 0)}
             />
           ))}
+          {/* raio de erro do GPS: some quando o fix é bom */}
+          {pos && pos.accuracy > 25 && (
+            <Circle
+              center={[pos.lat, pos.lng]}
+              radius={pos.accuracy}
+              pathOptions={{ color: "#2563eb", weight: 1, opacity: 0.5, fillOpacity: 0.08 }}
+            />
+          )}
           {pos && (
             <Marker
               position={[pos.lat, pos.lng]}
@@ -529,14 +634,35 @@ export function CourierMap({
           Libere a localização do celular para ver sua posição e navegar.
         </p>
       )}
+      {badFix && (
+        <p className="text-center text-xs text-warning">
+          GPS impreciso (±{Math.round(pos!.accuracy)} m). Saia de dentro do prédio ou ligue o GPS de alta precisão.
+        </p>
+      )}
       {pending > 0 && (
         <p className="text-center text-xs text-muted-foreground">
           Localizando {pending} endereço(s)...
         </p>
       )}
+      {approximate.length > 0 && (
+        <p className="text-center text-xs text-warning">
+          Pino aproximado (laranja), confirme o número com o cliente:{" "}
+          {approximate
+            .map((s) => `${s.index}. ${s.label} (${s.precision === "rua" ? "só a rua" : "centro do bairro"})`)
+            .join(", ")}
+        </p>
+      )}
       {notFound.length > 0 && (
         <p className="text-center text-xs text-destructive">
           Endereço não encontrado no mapa: {notFound.map((s) => `${s.index}. ${s.label}`).join(", ")}
+        </p>
+      )}
+      {unreachable.length > 0 && (
+        <p className="text-center text-xs text-destructive">
+          Sem resposta do serviço de mapas para {unreachable.length} endereço(s).{" "}
+          <button type="button" className="underline" onClick={retryFailed}>
+            Tentar de novo
+          </button>
         </p>
       )}
 

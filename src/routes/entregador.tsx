@@ -419,6 +419,9 @@ function CourierPage() {
                     index: idx + 1,
                     label: s.customers?.name ?? "Consumidor final",
                     address: fullAddress(s),
+                    street: s.delivery_address,
+                    neighborhood: s.neighborhood,
+                    city: s.city?.replace(/\s*-\s*[A-Za-z]{2}$/, "") ?? null,
                   }))}
                   onOpenStops={() => setTab("list")}
                 />

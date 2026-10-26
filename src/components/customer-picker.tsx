@@ -27,6 +27,15 @@ type Customer = {
   customer_type: string;
 };
 
+// o cliente recém-cadastrado, com o endereço: a lista `customers` do PDV
+// ainda não foi recarregada quando o onChange dispara
+export type CreatedCustomer = {
+  id: string;
+  address: string | null;
+  neighborhood: string | null;
+  city: string | null;
+};
+
 /**
  * Busca de cliente para o PDV: acha por nome, telefone ou documento, e tem
  * uma saída rápida para cadastrar quem chegou pela primeira vez sem sair da
@@ -42,7 +51,7 @@ export function CustomerPicker({
 }: {
   customers: Customer[];
   value: string;
-  onChange: (id: string) => void;
+  onChange: (id: string, created?: CreatedCustomer) => void;
   allowNone?: boolean;
   noneLabel?: string;
 }) {
@@ -69,7 +78,9 @@ export function CustomerPicker({
     onSuccess: (customer) => {
       toast.success("Cliente cadastrado");
       qc.invalidateQueries({ queryKey: ["customers"] });
-      onChange(customer.id);
+      // passa o cadastro junto: senão o PDV não acha o cliente na lista
+      // antiga e o endereço que acabou de ser digitado some do pedido
+      onChange(customer.id, customer);
       setQuickAdd(false);
       setForm(emptyCustomerForm);
     },
