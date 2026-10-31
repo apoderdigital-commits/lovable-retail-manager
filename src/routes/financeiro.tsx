@@ -1,10 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Wallet, SlidersHorizontal, Package } from "lucide-react";
+import { Wallet, SlidersHorizontal, Package, RefreshCw, TriangleAlert } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
 import { useAuth } from "@/hooks/useAuth";
+import { useMetaSync } from "@/hooks/use-meta-sync";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { brl, monthStartISO, todayISO } from "@/lib/format";
+import { brl, dateTime, monthStartISO, todayISO } from "@/lib/format";
 
 export const Route = createFileRoute("/financeiro")({
   head: () => ({
@@ -105,6 +106,18 @@ function FinancePage() {
     },
   });
 
+  // tráfego vem do Meta: sincroniza sozinho ao abrir quando está velho
+  const meta = useMetaSync({ enabled: isAdmin });
+  const trafegoHint =
+    meta.trackedCount === 0
+      ? "nenhuma campanha acompanhada: marque em Configurações"
+      : meta.lastSync
+        ? `campanhas acompanhadas · sincronizado ${dateTime(meta.lastSync)}`
+        : "campanhas acompanhadas · ainda não sincronizado";
+
+  // produto vendido sem custo no cadastro entra como zero e esconde margem
+  const semCusto = byProduct.filter((p) => Number(p.unit_cost) === 0);
+
   const receita = Number(s?.receita ?? 0);
   const custos =
     Number(s?.custo_produto ?? 0) +
@@ -120,11 +133,22 @@ function FinancePage() {
       subtitle={s ? `${s.pedidos} pedido(s) no período, sem as canceladas` : "Carregando..."}
       actions={
         isAdmin ? (
-          <Button variant="outline" size="sm" asChild>
-            <Link to="/custos">
-              <SlidersHorizontal className="mr-1.5 size-3.5" /> Configurar custos
-            </Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={meta.sync.isPending}
+              onClick={() => meta.sync.mutate({})}
+            >
+              <RefreshCw className={`mr-1.5 size-3.5${meta.sync.isPending ? " animate-spin" : ""}`} />
+              {meta.sync.isPending ? "Sincronizando..." : "Sincronizar Meta"}
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/custos">
+                <SlidersHorizontal className="mr-1.5 size-3.5" /> Configurar custos
+              </Link>
+            </Button>
+          </div>
         ) : null
       }
     >
@@ -146,9 +170,13 @@ function FinancePage() {
         </div>
         <div className="divide-y divide-border">
           <Line label="Faturamento" value={receita} strong />
-          <Line label="Custo dos produtos" value={-Number(s?.custo_produto ?? 0)} />
+          <Line
+            label="Custo dos produtos"
+            value={-Number(s?.custo_produto ?? 0)}
+            hint="quantidade × custo de cada produto"
+          />
           <Line label="Motoboy" value={-Number(s?.custo_motoboy ?? 0)} hint="taxas devidas" />
-          <Line label="Tráfego" value={-Number(s?.custo_trafego ?? 0)} hint="gasto nas campanhas" />
+          <Line label="Tráfego" value={-Number(s?.custo_trafego ?? 0)} hint={trafegoHint} />
           <Line
             label="Custos fixos"
             value={-Number(s?.custo_fixo ?? 0)}
@@ -242,12 +270,29 @@ function FinancePage() {
           <div>
             <h2 className="text-sm font-semibold">Custo de produto</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Quantidade e custo de catálogo de cada produto vendido no período. Pode não bater
-              exato com "Custo dos produtos" acima quando o custo do kit difere da soma dos custos
-              individuais.
+              Quantidade vendida vezes o custo cadastrado em cada produto. A soma desta tabela é
+              o "Custo dos produtos" lá em cima.
             </p>
           </div>
         </div>
+        {semCusto.length > 0 && (
+          <div className="flex items-start gap-2 border-b border-border bg-warning/10 px-4 py-3 text-sm">
+            <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
+            <div>
+              <p className="font-medium">
+                {semCusto.length} produto(s) vendido(s) sem custo no cadastro
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {semCusto.map((p) => p.product_name).join(", ")}. Entram como custo zero e inflam
+                a margem.{" "}
+                <Link to="/produtos" className="underline underline-offset-2">
+                  Preencher o custo em Produtos
+                </Link>
+                .
+              </p>
+            </div>
+          </div>
+        )}
         <Table>
           <TableHeader>
             <TableRow>

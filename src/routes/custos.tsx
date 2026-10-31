@@ -17,7 +17,7 @@ export const Route = createFileRoute("/custos")({
       { title: "Custos — Vieira Perfumes" },
       {
         name: "description",
-        content: "Custo de cada oferta e custos fixos mensais usados no cálculo da margem.",
+        content: "Custos fixos mensais usados no cálculo da margem; o custo dos produtos vem do cadastro.",
       },
     ],
   }),
@@ -38,15 +38,6 @@ function CostsPage() {
     },
   });
 
-  const { data: costs = [] } = useQuery({
-    queryKey: ["offer-costs"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("offer_costs").select("*");
-      if (error) throw error;
-      return data;
-    },
-  });
-
   const { data: fixed = [] } = useQuery({
     queryKey: ["fixed-costs"],
     queryFn: async () => {
@@ -61,25 +52,9 @@ function CostsPage() {
   });
 
   const refresh = () => {
-    qc.invalidateQueries({ queryKey: ["offer-costs"] });
     qc.invalidateQueries({ queryKey: ["fixed-costs"] });
     qc.invalidateQueries({ queryKey: ["finance"] });
   };
-
-  const saveKit = useMutation({
-    mutationFn: async ({ offerId, value }: { offerId: string; value: number }) => {
-      const { error } = await supabase.from("offer_costs").upsert(
-        { offer_id: offerId, kit_cost: value, updated_at: new Date().toISOString() },
-        { onConflict: "offer_id" },
-      );
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Custo salvo");
-      refresh();
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
 
   const addFixed = useMutation({
     mutationFn: async () => {
@@ -142,8 +117,6 @@ function CostsPage() {
     );
   }
 
-  const kitOf = (offerId: string) => costs.find((c) => c.offer_id === offerId)?.kit_cost ?? "";
-
   return (
     <AppShell
       title="Custos"
@@ -154,51 +127,24 @@ function CostsPage() {
         <section className="panel p-4">
           <div className="mb-3 flex items-center gap-2">
             <SlidersHorizontal className="size-4 text-muted-foreground" />
-            <h2 className="text-sm font-semibold">Custo por oferta</h2>
+            <h2 className="text-sm font-semibold">Custo dos produtos</h2>
           </div>
           <p className="mb-4 text-xs text-muted-foreground">
-            Quanto custa montar um kit inteiro, não por perfume. Venda avulsa não usa este campo —
-            ela calcula pelo preço de custo de cada produto no cadastro.
+            O Financeiro calcula o custo de cada venda pela quantidade vendida vezes o campo
+            "Custo" de cada produto, em kit ou avulso. Não há custo por oferta: preencha o custo
+            no cadastro de cada produto.
           </p>
-          <div className="space-y-3">
-            {offers.map((o) => {
-              const custo = Number(kitOf(o.id) || 0);
-              const margem = Number(o.price) > 0 ? ((Number(o.price) - custo) / Number(o.price)) * 100 : 0;
-              return (
-                <div key={o.id}>
-                  <div className="flex items-end gap-2">
-                    <div className="flex-1 space-y-1.5">
-                      <Label className="text-xs">{o.name}</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        defaultValue={kitOf(o.id)}
-                        placeholder="0,00"
-                        onBlur={(e) => {
-                          const v = Number(e.target.value || 0);
-                          if (v !== custo) saveKit.mutate({ offerId: o.id, value: v });
-                        }}
-                      />
-                    </div>
-                    <p className="pb-2.5 text-xs text-muted-foreground">
-                      vende por {brl(Number(o.price))}
-                    </p>
-                  </div>
-                  {custo > 0 && (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Sobra {brl(Number(o.price) - custo)} por kit ({margem.toFixed(0)}%), antes de
-                      motoboy e tráfego.
-                    </p>
-                  )}
-                </div>
-              );
-            })}
-            {offers.length === 0 && (
-              <p className="py-4 text-center text-sm text-muted-foreground">
-                Nenhuma oferta cadastrada.
+          <div className="space-y-2 text-xs text-muted-foreground">
+            {offers.map((o) => (
+              <p key={o.id}>
+                {o.name}: vende por {brl(Number(o.price))} · custo = soma dos {o.item_count} produtos
+                do kit
               </p>
-            )}
+            ))}
           </div>
+          <Button variant="outline" size="sm" className="mt-4" asChild>
+            <Link to="/produtos">Abrir cadastro de produtos</Link>
+          </Button>
         </section>
 
         <section className="panel p-4">

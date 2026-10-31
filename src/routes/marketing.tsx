@@ -4,6 +4,7 @@ import { useState } from "react";
 import { TrendingUp, Sprout, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useMetaSync } from "@/hooks/use-meta-sync";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -122,6 +123,9 @@ function MarketingPage() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  // sincroniza sozinho ao abrir quando o último dado do Meta está velho
+  useMetaSync({ enabled: true });
 
   const { data: rows = [] } = useQuery({
     queryKey: ["marketing", "offers", from, to],
