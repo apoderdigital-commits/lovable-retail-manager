@@ -605,23 +605,43 @@ grant execute on function set_delivery_payment(uuid, text, text, numeric, text, 
 
 -- ---- 5. Postagem nos Correios ----
 
-create or replace function post_correios(p_sale uuid, p_tracking text default null)
-returns sales
+-- Qualquer pedido separado pode ir pelos Correios na hora do despacho,
+-- mesmo que o PDV tenha previsto motoboy. Sai da rota em montagem, vira
+-- 'correios', aceita um frete novo (cobrado do cliente) e vai direto pra
+-- entregue; o estoque reservado e baixado pela transition_sale.
+create or replace function post_correios(
+  p_sale     uuid,
+  p_tracking text    default null,
+  p_fee      numeric default null
+) returns sales
 language plpgsql security definer set search_path = public as $$
 declare v_sale sales;
 begin
   if not is_staff() then raise exception 'Sem permissão'; end if;
-  select * into v_sale from sales where id = p_sale;
+  select * into v_sale from sales where id = p_sale for update;
   if not found then raise exception 'Venda não encontrada'; end if;
-  if v_sale.shipping_method <> 'correios' then
-    raise exception 'Este pedido não é por Correios';
+  if v_sale.status <> 'picked' then
+    raise exception 'Só pedido separado pode ser postado nos Correios';
   end if;
-  update sales set tracking_code = nullif(trim(coalesce(p_tracking, '')), '') where id = p_sale;
+  if p_fee is not null and p_fee < 0 then raise exception 'Frete inválido'; end if;
+
+  update sales set
+    shipping_method = 'correios',
+    tracking_code   = nullif(trim(coalesce(p_tracking, '')), ''),
+    delivery_fee    = coalesce(p_fee, delivery_fee),
+    route_id        = null,
+    courier_id      = null,
+    updated_at      = now()
+  where id = p_sale;
+
+  -- frete mudou: total e taxa do cartao acompanham
+  perform apply_payment_fees(p_sale);
+
   return transition_sale(p_sale, 'delivered');
 end $$;
 
-revoke all on function post_correios(uuid, text) from public, anon;
-grant execute on function post_correios(uuid, text) to authenticated;
+revoke all on function post_correios(uuid, text, numeric) from public, anon;
+grant execute on function post_correios(uuid, text, numeric) to authenticated;
 
 -- ---- 6. Acerto do entregador: valores sem a taxa da outra forma ----
 

@@ -11,6 +11,7 @@ import {
   Plus,
   Trash2,
   Eye,
+  Mailbox,
 } from "lucide-react";
 import { OrderDetail } from "@/components/order-detail";
 import { toast } from "sonner";
@@ -24,6 +25,7 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -151,10 +153,7 @@ function DeliveriesPage() {
       ? Number(o.delivery_fee)
       : Number(fees.find((f) => f.neighborhood === o.neighborhood)?.amount ?? 0);
 
-  // pedido por Correios não vai pra rota: é postado na tela de Pedidos
-  const queue = orders.filter(
-    (o) => o.status === "picked" && !o.route_id && o.shipping_method !== "correios",
-  );
+  const queue = orders.filter((o) => o.status === "picked" && !o.route_id);
   // esperando a loja mandar de volta pra fila: agendado pra hoje (ou antes)
   // e não entregue. Os dois guardam a rota antiga, por isso não entram em
   // `queue` nem em `stopsOf` até alguém clicar em "Pra fila".
@@ -162,6 +161,12 @@ function DeliveriesPage() {
     (o) =>
       o.status === "not_delivered" ||
       (o.status === "scheduled" && o.scheduled_for && o.scheduled_for <= today),
+  );
+
+  // despacho pelos Correios: qualquer pedido separado pode ir pelo correio
+  // em vez de motoboy. O frete cobrado do cliente pode ser ajustado na hora.
+  const [posting, setPosting] = useState<{ id: string; fee: string; tracking: string } | null>(
+    null,
   );
 
   const invalidate = () => {
@@ -186,6 +191,24 @@ function DeliveriesPage() {
       if (e2) throw e2;
     },
     onSuccess: invalidate,
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const postCorreios = useMutation({
+    mutationFn: async (p: { id: string; fee: number | null; tracking: string }) => {
+      const { error } = await supabase.rpc("post_correios" as never, {
+        p_sale: p.id,
+        p_tracking: p.tracking.trim() || null,
+        p_fee: p.fee,
+      } as never);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Pedido postado nos Correios");
+      setPosting(null);
+      invalidate();
+      qc.invalidateQueries({ queryKey: ["products"] });
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -297,6 +320,62 @@ function DeliveriesPage() {
         </div>
       )}
 
+      <Dialog open={!!posting} onOpenChange={(v) => !v && setPosting(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Despachar pelos Correios</DialogTitle>
+          </DialogHeader>
+          {posting && (
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label>Frete cobrado do cliente (R$)</Label>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  placeholder="0,00"
+                  value={posting.fee}
+                  onChange={(e) => setPosting({ ...posting, fee: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Substitui a taxa de entrega do pedido. O total e a taxa do cartão são refeitos.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Código de rastreio (opcional)</Label>
+                <Input
+                  value={posting.tracking}
+                  onChange={(e) => setPosting({ ...posting, tracking: e.target.value })}
+                  placeholder="AA123456789BR"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                O pedido sai da fila sem passar por motoboy, é dado como entregue e o estoque
+                reservado é baixado.
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setPosting(null)}>
+              Voltar
+            </Button>
+            <Button
+              disabled={postCorreios.isPending || !posting}
+              onClick={() =>
+                posting &&
+                postCorreios.mutate({
+                  id: posting.id,
+                  fee: posting.fee.trim() === "" ? null : Number(posting.fee.replace(",", ".")),
+                  tracking: posting.tracking,
+                })
+              }
+            >
+              Confirmar postagem
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
         <section className="panel h-fit">
           <header className="flex items-center justify-between border-b border-border px-4 py-3">
@@ -321,6 +400,11 @@ function DeliveriesPage() {
                     <Badge variant="secondary" className="text-[10px]">
                       #{o.sale_number}
                     </Badge>
+                    {o.shipping_method === "correios" && (
+                      <Badge variant="secondary" className="text-[10px]">
+                        Correios
+                      </Badge>
+                    )}
                     {o.customers?.customer_type === "wholesale" && (
                       <Badge variant="secondary" className="text-[10px]">
                         atacado
@@ -350,6 +434,21 @@ function DeliveriesPage() {
                     ))}
                   </SelectContent>
                 </Select>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2 h-8 w-full text-xs"
+                  disabled={postCorreios.isPending}
+                  onClick={() =>
+                    setPosting({
+                      id: o.id,
+                      fee: Number(o.delivery_fee) > 0 ? String(Number(o.delivery_fee)) : "",
+                      tracking: "",
+                    })
+                  }
+                >
+                  <Mailbox className="mr-1.5 size-3.5" /> Despachar pelos Correios
+                </Button>
               </article>
             ))}
             {queue.length === 0 && (
