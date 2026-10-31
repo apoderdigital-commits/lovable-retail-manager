@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import {
   Camera,
+  Image as ImageIcon,
   CalendarClock,
   XCircle,
   Flag,
@@ -53,7 +54,49 @@ export const Route = createFileRoute("/entregador")({
   component: CourierPage,
 });
 
-const PAYMENTS = ["dinheiro", "pix", "débito", "crédito", "boleto"];
+// formas que o entregador escolhe na entrega, em botões grandes. Boleto não
+// se paga na porta, então só aparece se o pedido já veio marcado assim.
+const METHODS = ["dinheiro", "pix", "débito", "crédito"];
+const METHOD_LABEL: Record<string, string> = {
+  dinheiro: "Dinheiro",
+  pix: "Pix",
+  "débito": "Cartão débito",
+  "crédito": "Cartão crédito",
+  boleto: "Boleto",
+};
+
+function MethodPicker({
+  label,
+  value,
+  onChange,
+  exclude,
+}: {
+  label: string;
+  value: string;
+  onChange: (m: string) => void;
+  exclude?: string;
+}) {
+  const options = METHODS.includes(value) ? METHODS : [...METHODS, value];
+  return (
+    <div className="space-y-1.5">
+      <Label>{label}</Label>
+      <div className="grid grid-cols-2 gap-2">
+        {options.map((m) => (
+          <Button
+            key={m}
+            type="button"
+            className="h-11"
+            variant={value === m ? "default" : "outline"}
+            disabled={m === exclude}
+            onClick={() => onChange(m)}
+          >
+            {METHOD_LABEL[m] ?? m}
+          </Button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 const REASONS = [
   "Cliente ausente",
@@ -488,6 +531,24 @@ function StopCard({
   const [date, setDate] = useState("");
   const [reason, setReason] = useState(REASONS[0]);
 
+  // foto: dois caminhos explícitos. "capture" abre a câmera direto; sem ele
+  // abre a galeria/arquivos. Um input só deixava o aparelho decidir e em
+  // alguns celulares a galeria nem aparecia.
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
+  const preview = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
+  useEffect(() => {
+    return () => {
+      if (preview) URL.revokeObjectURL(preview);
+    };
+  }, [preview]);
+  const pickFile = (e: ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0] ?? null;
+    if (f) setFile(f);
+    // permite escolher o mesmo arquivo de novo depois de trocar
+    e.target.value = "";
+  };
+
   // pagamento na hora da entrega: o cliente pode trocar a forma ou dividir
   // em duas (ex.: parte no pix, parte em dinheiro)
   const total = Number(stop.total);
@@ -500,6 +561,20 @@ function StopCard({
   );
   const value2 = Number(amount2.replace(",", ".") || 0);
   const splitInvalid = !paid && split && (pay2 === pay1 || value2 <= 0 || value2 >= total);
+  // trocar uma forma nunca deixa as duas iguais: a outra pula pra próxima
+  const other = (m: string) => (m === "pix" ? "dinheiro" : "pix");
+  const choose1 = (m: string) => {
+    setPay1(m);
+    if (split && pay2 === m) setPay2(other(m));
+  };
+  const choose2 = (m: string) => {
+    setPay2(m);
+    if (pay1 === m) setPay1(other(m));
+  };
+  const chooseSplit = (on: boolean) => {
+    setSplit(on);
+    if (on && pay2 === pay1) setPay2(other(pay1));
+  };
   // pix: caiu na máquina (loja) ou na chave do entregador (entra no acerto)
   const hasPix = pay1 === "pix" || (split && pay2 === "pix");
   const [pixTo, setPixTo] = useState<"maquina" | "entregador" | "">(stop.pix_to ?? "");
@@ -680,57 +755,55 @@ function StopCard({
                 </div>
               )}
               {!paid && (
-              <div className="space-y-2">
-                <Label>Forma de pagamento</Label>
-                <Select value={pay1} onValueChange={setPay1}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PAYMENTS.map((p) => (
-                      <SelectItem key={p} value={p}>
-                        {p}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label>Como o cliente pagou?</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      className="h-11"
+                      variant={!split ? "default" : "outline"}
+                      onClick={() => chooseSplit(false)}
+                    >
+                      1 forma
+                    </Button>
+                    <Button
+                      type="button"
+                      className="h-11"
+                      variant={split ? "default" : "outline"}
+                      onClick={() => chooseSplit(true)}
+                    >
+                      2 formas
+                    </Button>
+                  </div>
+                </div>
 
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={split}
-                    onChange={(e) => setSplit(e.target.checked)}
-                  />
-                  Cliente pagou em 2 formas
-                </label>
+                <MethodPicker
+                  label={split ? "1ª forma" : "Forma de pagamento"}
+                  value={pay1}
+                  onChange={choose1}
+                />
 
                 {split && (
                   <div className="space-y-2 rounded-md border border-border p-3">
-                    <div className="grid grid-cols-2 gap-2">
-                      <Select value={pay2} onValueChange={setPay2}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {PAYMENTS.filter((p) => p !== pay1).map((p) => (
-                            <SelectItem key={p} value={p}>
-                              {p}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <MethodPicker label="2ª forma" value={pay2} onChange={choose2} exclude={pay1} />
+                    <div className="space-y-1.5">
+                      <Label>Valor pago na 2ª forma ({METHOD_LABEL[pay2] ?? pay2})</Label>
                       <Input
                         type="number"
                         inputMode="decimal"
                         step="0.01"
-                        placeholder="Valor"
+                        className="h-11 text-base"
+                        placeholder="0,00"
                         value={amount2}
                         onChange={(e) => setAmount2(e.target.value)}
                       />
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      {pay1}: <strong>{brl(Math.max(0, total - value2))}</strong> · {pay2}:{" "}
-                      <strong>{brl(value2)}</strong> · total {brl(total)}
+                    <p className="text-sm">
+                      {METHOD_LABEL[pay1] ?? pay1}: <strong>{brl(Math.max(0, total - value2))}</strong>
+                      {" · "}
+                      {METHOD_LABEL[pay2] ?? pay2}: <strong>{brl(value2)}</strong>
+                      <span className="text-muted-foreground"> · total {brl(total)}</span>
                     </p>
                     {splitInvalid && (
                       <p className="text-xs text-destructive">
@@ -771,17 +844,59 @@ function StopCard({
 
               <div className="space-y-2">
                 <Label>{paid ? "Foto da entrega" : "Foto do comprovante"}</Label>
-                {/* sem "capture": o celular oferece tirar foto agora ou
-                    escolher uma da galeria */}
-                <Input
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11"
+                    onClick={() => cameraRef.current?.click()}
+                  >
+                    <Camera className="mr-1.5 size-4" /> Tirar foto
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11"
+                    onClick={() => galleryRef.current?.click()}
+                  >
+                    <ImageIcon className="mr-1.5 size-4" /> Da galeria
+                  </Button>
+                </div>
+                <input
+                  ref={cameraRef}
                   type="file"
                   accept="image/*"
-                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                  capture="environment"
+                  className="hidden"
+                  onChange={pickFile}
                 />
+                <input
+                  ref={galleryRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={pickFile}
+                />
+                {file && preview && (
+                  <div className="flex items-center gap-3 rounded-md border border-border p-2">
+                    <img
+                      src={preview}
+                      alt="Foto escolhida"
+                      className="size-16 shrink-0 rounded object-cover"
+                    />
+                    <div className="min-w-0 flex-1 text-xs">
+                      <p className="truncate font-medium">{file.name}</p>
+                      <p className="text-muted-foreground">Foto pronta pra enviar.</p>
+                    </div>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setFile(null)}>
+                      Trocar
+                    </Button>
+                  </div>
+                )}
                 <p className="text-xs text-muted-foreground">
                   {paid
                     ? "Tire a foto do produto entregue, na mão do cliente ou no local. Sem a foto a entrega não é concluída."
-                    : "Tire a foto na hora ou escolha da galeria. Sem a foto a entrega não é concluída. Vale o comprovante de pagamento ou a nota assinada."}
+                    : "Sem a foto a entrega não é concluída. Vale o comprovante de pagamento ou a nota assinada."}
                 </p>
               </div>
             </div>
