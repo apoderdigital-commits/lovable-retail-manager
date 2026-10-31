@@ -38,6 +38,8 @@ type Summary = {
   receita: number;
   custo_produto: number;
   custo_motoboy: number;
+  custo_correios: number;
+  custo_taxas: number;
   custo_trafego: number;
   custo_fixo: number;
 };
@@ -124,6 +126,8 @@ function FinancePage() {
   const custos =
     Number(s?.custo_produto ?? 0) +
     Number(s?.custo_motoboy ?? 0) +
+    Number(s?.custo_correios ?? 0) +
+    Number(s?.custo_taxas ?? 0) +
     Number(s?.custo_trafego ?? 0);
   const lucro = receita - custos;
   const margem = receita > 0 ? (lucro / receita) * 100 : null;
@@ -177,6 +181,16 @@ function FinancePage() {
             hint="quantidade × custo de cada produto"
           />
           <Line label="Motoboy" value={-Number(s?.custo_motoboy ?? 0)} hint="taxas devidas" />
+          <Line
+            label="Correios"
+            value={-Number(s?.custo_correios ?? 0)}
+            hint="frete postado, cobrado do cliente"
+          />
+          <Line
+            label="Impostos"
+            value={-Number(s?.custo_taxas ?? 0)}
+            hint="taxas da maquininha: pix por conta da loja, débito e crédito repassados"
+          />
           <Line label="Tráfego" value={-Number(s?.custo_trafego ?? 0)} hint={trafegoHint} />
           <div className="flex items-center justify-between px-4 py-3">
             <div>

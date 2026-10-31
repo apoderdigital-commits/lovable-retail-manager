@@ -7,6 +7,9 @@ export type ReceiptCanvasSale = {
   discount: number;
   subtotal: number;
   delivery_fee: number;
+  card_fee: number;
+  shipping_method: string | null;
+  tracking_code: string | null;
   total: number;
   neighborhood: string | null;
   delivery_address: string | null;
@@ -110,7 +113,9 @@ export function renderReceiptCanvas(
   lines += 2; // total de unidades, subtotal
   if (sale.discount > 0) lines += 1;
   if (sale.delivery_fee > 0) lines += 1;
+  if (sale.card_fee > 0) lines += 1;
   lines += 2; // total, pagamento
+  if (sale.tracking_code) lines += 1;
   lines += 1; // divisor
   lines += 1; // agradecimento
 
@@ -219,9 +224,13 @@ export function renderReceiptCanvas(
   row("Total de unidades", String(items.reduce((s, i) => s + i.quantity, 0)));
   row("Subtotal", brl(sale.subtotal));
   if (sale.discount > 0) row("Desconto", `-${brl(sale.discount)}`);
-  if (sale.delivery_fee > 0) row("Taxa de entrega", brl(sale.delivery_fee));
+  if (sale.delivery_fee > 0) {
+    row(sale.shipping_method === "correios" ? "Frete Correios" : "Taxa de entrega", brl(sale.delivery_fee));
+  }
+  if (sale.card_fee > 0) row("Taxa do cartão", brl(sale.card_fee));
   row("Total", brl(sale.total), true);
   row("Pagamento", sale.payment_method);
+  if (sale.tracking_code) row("Rastreio", sale.tracking_code);
 
   divider();
   center("Obrigado pela preferência!");

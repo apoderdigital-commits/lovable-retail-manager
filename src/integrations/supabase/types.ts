@@ -572,6 +572,12 @@ export type Database = {
           payment_method: string
           payment_method_2: string | null
           paid_at: string | null
+          installments: number
+          surcharge_1: number
+          surcharge_2: number
+          fee_cost: number
+          shipping_method: string
+          tracking_code: string | null
           proof_url: string | null
           reason: string | null
           route_id: string | null
@@ -602,6 +608,12 @@ export type Database = {
           payment_method?: string
           payment_method_2?: string | null
           paid_at?: string | null
+          installments?: number
+          surcharge_1?: number
+          surcharge_2?: number
+          fee_cost?: number
+          shipping_method?: string
+          tracking_code?: string | null
           proof_url?: string | null
           reason?: string | null
           route_id?: string | null
@@ -632,6 +644,12 @@ export type Database = {
           payment_method?: string
           payment_method_2?: string | null
           paid_at?: string | null
+          installments?: number
+          surcharge_1?: number
+          surcharge_2?: number
+          fee_cost?: number
+          shipping_method?: string
+          tracking_code?: string | null
           proof_url?: string | null
           reason?: string | null
           route_id?: string | null
@@ -767,6 +785,9 @@ export type Database = {
           p_notes?: string
           p_offer?: string
           p_paid?: boolean
+          p_installments?: number
+          p_shipping_method?: string
+          p_manual_fee?: number
           p_payment_method: string
         }
         Returns: {
@@ -787,6 +808,12 @@ export type Database = {
           payment_method: string
           payment_method_2: string | null
           paid_at: string | null
+          installments: number
+          surcharge_1: number
+          surcharge_2: number
+          fee_cost: number
+          shipping_method: string
+          tracking_code: string | null
           proof_url: string | null
           reason: string | null
           route_id: string | null
@@ -947,6 +974,12 @@ export type Database = {
           payment_method: string
           payment_method_2: string | null
           paid_at: string | null
+          installments: number
+          surcharge_1: number
+          surcharge_2: number
+          fee_cost: number
+          shipping_method: string
+          tracking_code: string | null
           proof_url: string | null
           reason: string | null
           route_id: string | null

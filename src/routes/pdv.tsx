@@ -23,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { applyOffers } from "@/lib/offers";
+import { surchargeFor, feePct, INSTALLMENTS, type FeeRow } from "@/lib/fees";
 import {
   Select,
   SelectContent,
@@ -79,6 +80,11 @@ function PdvPage() {
   // pagamento já confirmado no lançamento: o motoboy não cobra na entrega,
   // só tira a foto. O banco grava em sales.paid_at.
   const [paid, setPaid] = useState(false);
+  // parcelas do crédito: definem a taxa da maquininha cobrada do cliente
+  const [installments, setInstallments] = useState(1);
+  // região sem taxa cadastrada: motoboy com taxa digitada ou Correios com o frete
+  const [shipping, setShipping] = useState<"motoboy" | "correios">("motoboy");
+  const [manualFee, setManualFee] = useState("");
   const [discount, setDiscount] = useState("0");
   const [address, setAddress] = useState("");
   const [neighborhood, setNeighborhood] = useState("");
@@ -130,6 +136,18 @@ function PdvPage() {
         .order("item_count");
       if (error) throw error;
       return data;
+    },
+  });
+
+  // taxas da maquininha (Configurações); types.ts ainda não conhece a tabela
+  const { data: fees = [] } = useQuery({
+    queryKey: ["payment-fees"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("payment_fees" as never)
+        .select("method, installments, rate_pct");
+      if (error) throw error;
+      return (data ?? []) as unknown as FeeRow[];
     },
   });
 
@@ -219,8 +237,19 @@ function PdvPage() {
       return z?.id ? z : null;
     },
   });
-  const deliveryFee = mode === "delivery" && quote?.serves ? Number(quote.amount ?? 0) : 0;
-  const total = base - discountValue + deliveryFee;
+  // região sem taxa cadastrada (ou não atendida): o PDV aceita motoboy com
+  // taxa digitada ou Correios com o valor do frete cobrado do cliente
+  const manualNeeded = mode === "delivery" && !!city.trim() && !quoting && !quote?.serves;
+  const manualValue = Number(manualFee.replace(",", ".") || 0);
+  const manualOk = manualNeeded && manualFee.trim() !== "" && manualValue >= 0;
+  const deliveryFee =
+    mode !== "delivery" ? 0 : quote?.serves ? Number(quote.amount ?? 0) : manualOk ? manualValue : 0;
+  const baseTotal = base - discountValue + deliveryFee;
+  // taxa da maquininha em cima do total, cobrada do cliente (débito/crédito);
+  // o banco refaz a mesma conta em apply_payment_fees
+  const surcharge = surchargeFor(fees, payment, installments, baseTotal);
+  const surchargePct = feePct(fees, payment, installments);
+  const total = baseTotal + surcharge;
 
   const add = (p: (typeof products)[number]) => {
     const inCart = cart.find((i) => i.productId === p.id)?.quantity ?? 0;
@@ -265,6 +294,9 @@ function PdvPage() {
     setCity("");
     setNotes("");
     setPaid(false);
+    setInstallments(1);
+    setShipping("motoboy");
+    setManualFee("");
   };
 
   const finish = useMutation({
@@ -287,6 +319,11 @@ function PdvPage() {
         p_counter_sale: counterSale,
         // só manda quando marcado: venda de balcão já é paga na hora
         ...(paid && !counterSale ? { p_paid: true } : {}),
+        // parcelas só no crédito; frete manual só quando a região não tem taxa
+        ...(payment === "crédito" && installments > 1 ? { p_installments: installments } : {}),
+        ...(manualNeeded && !counterSale
+          ? { p_shipping_method: shipping, p_manual_fee: manualValue }
+          : {}),
         ...(notes.trim() ? { p_notes: notes.trim() } : {}),
       });
 
@@ -314,7 +351,7 @@ function PdvPage() {
   const missingAddress = mode === "delivery" && (!address.trim() || !neighborhood.trim());
   // sem cidade, cidade sem taxa cadastrada ou região que a loja não atende
   const feeBlocked =
-    mode === "delivery" && (!city.trim() || quoting || !quote || !quote.serves);
+    mode === "delivery" && (!city.trim() || quoting || (!quote?.serves && !manualOk));
   const blocked =
     finish.isPending || cart.length === 0 || missingCustomer || missingAddress || feeBlocked;
 
@@ -592,13 +629,9 @@ function PdvPage() {
                     </span>
                   ) : quoting ? (
                     <span className="text-muted-foreground">Calculando taxa...</span>
-                  ) : !quote ? (
-                    <span className="text-destructive">
-                      Sem taxa cadastrada para essa cidade. Confira o nome ou cadastre em Entregas.
-                    </span>
-                  ) : !quote.serves ? (
-                    <span className="text-destructive">
-                      Não atendemos essa região ({neighborhood || city}).
+                  ) : !quote?.serves ? (
+                    <span className="text-muted-foreground">
+                      Sem taxa cadastrada para {neighborhood || city}. Escolha abaixo como enviar.
                     </span>
                   ) : (
                     <span className="text-success">
@@ -606,6 +639,47 @@ function PdvPage() {
                     </span>
                   )}
                 </p>
+
+                {manualNeeded && (
+                  <div className="space-y-2 rounded-md border border-border p-3 sm:col-span-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        type="button"
+                        variant={shipping === "motoboy" ? "default" : "outline"}
+                        onClick={() => setShipping("motoboy")}
+                      >
+                        Motoboy
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={shipping === "correios" ? "default" : "outline"}
+                        onClick={() => setShipping("correios")}
+                      >
+                        Correios
+                      </Button>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>
+                        {shipping === "correios"
+                          ? "Valor do frete cobrado do cliente (R$)"
+                          : "Taxa de entrega do motoboy (R$)"}
+                      </Label>
+                      <Input
+                        type="number"
+                        inputMode="decimal"
+                        step="0.01"
+                        placeholder="0,00"
+                        value={manualFee}
+                        onChange={(e) => setManualFee(e.target.value)}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {shipping === "correios"
+                        ? "Não entra em rota: depois de separado, o pedido é postado nos Correios com o código de rastreio."
+                        : "Entra na fila do motoboy como os outros, com essa taxa."}
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
@@ -635,6 +709,27 @@ function PdvPage() {
                 />
               </div>
             </div>
+
+            {payment === "crédito" && (
+              <div className="space-y-1.5">
+                <Label>Parcelas</Label>
+                <Select
+                  value={String(installments)}
+                  onValueChange={(v) => setInstallments(Number(v))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {INSTALLMENTS.map((n) => (
+                      <SelectItem key={n} value={String(n)}>
+                        {n}x · taxa {feePct(fees, "crédito", n).toFixed(2).replace(".", ",")}%
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {mode === "delivery" && (
               <label className="flex items-start gap-2 rounded-md border border-border p-3 text-sm">
@@ -687,8 +782,17 @@ function PdvPage() {
               </div>
               {mode === "delivery" && (
                 <div className="flex justify-between text-muted-foreground">
-                  <span>Taxa de entrega</span>
+                  <span>{manualNeeded && shipping === "correios" ? "Frete Correios" : "Taxa de entrega"}</span>
                   <span>{brl(deliveryFee)}</span>
+                </div>
+              )}
+              {surcharge > 0 && (
+                <div className="flex justify-between text-muted-foreground">
+                  <span>
+                    Taxa {payment === "crédito" ? `crédito ${installments}x` : "débito"} (
+                    {surchargePct.toFixed(2).replace(".", ",")}%)
+                  </span>
+                  <span>{brl(surcharge)}</span>
                 </div>
               )}
               <div className="mt-1 flex justify-between font-display text-lg font-semibold">

@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CourierMap } from "@/components/courier-map";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { surchargeFor, feePct, INSTALLMENTS, type FeeRow } from "@/lib/fees";
 import { AppShell } from "@/components/AppShell";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -505,6 +506,10 @@ type Stop = {
   pix_to?: "maquina" | "entregador" | null;
   // pago no lançamento: não cobra na entrega, só foto
   paid_at?: string | null;
+  // taxa da maquininha já somada em total, e parcelas do crédito
+  installments?: number;
+  surcharge_1?: number;
+  surcharge_2?: number;
   delivery_address: string | null;
   neighborhood: string | null;
   city: string | null;
@@ -553,6 +558,20 @@ function StopCard({
   // em duas (ex.: parte no pix, parte em dinheiro)
   const total = Number(stop.total);
   const paid = !!stop.paid_at;
+  // total sem a taxa da maquininha: é sobre ele que as formas se dividem.
+  // A taxa é refeita pelo banco quando o pagamento muda; aqui é só prévia.
+  const baseTotal = total - Number(stop.surcharge_1 ?? 0) - Number(stop.surcharge_2 ?? 0);
+  const { data: fees = [] } = useQuery({
+    queryKey: ["payment-fees"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("payment_fees" as never)
+        .select("method, installments, rate_pct");
+      if (error) throw error;
+      return (data ?? []) as unknown as FeeRow[];
+    },
+  });
+  const [inst, setInst] = useState(stop.installments ?? 1);
   const [pay1, setPay1] = useState(stop.payment_method);
   const [split, setSplit] = useState(!!stop.payment_method_2);
   const [pay2, setPay2] = useState(stop.payment_method_2 ?? "pix");
@@ -560,7 +579,13 @@ function StopCard({
     stop.payment_method_2 ? String(stop.payment_amount_2) : "",
   );
   const value2 = Number(amount2.replace(",", ".") || 0);
-  const splitInvalid = !paid && split && (pay2 === pay1 || value2 <= 0 || value2 >= total);
+  const splitInvalid = !paid && split && (pay2 === pay1 || value2 <= 0 || value2 >= baseTotal);
+  const base2 = split ? value2 : 0;
+  const base1 = Math.max(0, baseTotal - base2);
+  const s1 = surchargeFor(fees, pay1, inst, base1);
+  const s2 = split ? surchargeFor(fees, pay2, inst, base2) : 0;
+  const hasCredit = pay1 === "crédito" || (split && pay2 === "crédito");
+  const dueTotal = baseTotal + s1 + s2;
   // trocar uma forma nunca deixa as duas iguais: a outra pula pra próxima
   const other = (m: string) => (m === "pix" ? "dinheiro" : "pix");
   const choose1 = (m: string) => {
@@ -584,7 +609,8 @@ function StopCard({
     (pay1 !== stop.payment_method ||
       (split ? pay2 : null) !== (stop.payment_method_2 ?? null) ||
       (split ? value2 : 0) !== Number(stop.payment_amount_2 ?? 0) ||
-      (hasPix ? pixTo : null) !== (stop.pix_to ?? null));
+      (hasPix ? pixTo : null) !== (stop.pix_to ?? null) ||
+      (hasCredit ? inst : 1) !== (stop.installments ?? 1));
 
   const run = useMutation({
     mutationFn: async () => {
@@ -600,6 +626,7 @@ function StopCard({
             p_method_2: split ? pay2 : null,
             p_amount_2: split ? value2 : 0,
             p_pix_to: hasPix ? pixTo : null,
+            p_installments: hasCredit ? inst : 1,
           } as never);
           if (payErr) throw payErr;
         }
@@ -800,18 +827,45 @@ function StopCard({
                       />
                     </div>
                     <p className="text-sm">
-                      {METHOD_LABEL[pay1] ?? pay1}: <strong>{brl(Math.max(0, total - value2))}</strong>
+                      {METHOD_LABEL[pay1] ?? pay1}: <strong>{brl(base1 + s1)}</strong>
                       {" · "}
-                      {METHOD_LABEL[pay2] ?? pay2}: <strong>{brl(value2)}</strong>
-                      <span className="text-muted-foreground"> · total {brl(total)}</span>
+                      {METHOD_LABEL[pay2] ?? pay2}: <strong>{brl(base2 + s2)}</strong>
+                      <span className="text-muted-foreground"> · total {brl(dueTotal)}</span>
                     </p>
                     {splitInvalid && (
                       <p className="text-xs text-destructive">
                         {pay2 === pay1
                           ? "Escolha duas formas diferentes."
-                          : `O valor precisa ser maior que zero e menor que ${brl(total)}.`}
+                          : `O valor precisa ser maior que zero e menor que ${brl(baseTotal)}.`}
                       </p>
                     )}
+                  </div>
+                )}
+
+                {hasCredit && (
+                  <div className="space-y-1.5">
+                    <Label>Parcelas no crédito</Label>
+                    <Select value={String(inst)} onValueChange={(v) => setInst(Number(v))}>
+                      <SelectTrigger className="h-11">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {INSTALLMENTS.map((n) => (
+                          <SelectItem key={n} value={String(n)}>
+                            {n}x · taxa {feePct(fees, "crédito", n).toFixed(2).replace(".", ",")}%
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {(s1 > 0 || s2 > 0) && (
+                  <div className="rounded-md border border-border bg-muted px-3 py-2 text-sm">
+                    <p>
+                      Taxa da maquininha: <strong>{brl(s1 + s2)}</strong>
+                    </p>
+                    <p className="font-medium">Cliente paga: {brl(dueTotal)}</p>
                   </div>
                 )}
 

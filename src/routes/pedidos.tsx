@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Search, PackageCheck, RotateCcw, Ban, Eye, Printer, ListFilter } from "lucide-react";
+import { Search, PackageCheck, RotateCcw, Ban, Eye, Printer, ListFilter, Send } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
@@ -74,6 +75,9 @@ function OrdersPage() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [pickingId, setPickingId] = useState<string | null>(null);
   const [printingId, setPrintingId] = useState<string | null>(null);
+  // pedido por Correios não entra em rota: separado, é postado com rastreio
+  const [postingId, setPostingId] = useState<string | null>(null);
+  const [tracking, setTracking] = useState("");
 
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ["orders"],
@@ -106,6 +110,25 @@ function OrdersPage() {
       qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
     // a mensagem vem pronta do banco, em português
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const postCorreios = useMutation({
+    mutationFn: async (input: { id: string; tracking: string }) => {
+      const { error } = await supabase.rpc("post_correios" as never, {
+        p_sale: input.id,
+        p_tracking: input.tracking.trim() || null,
+      } as never);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Pedido postado nos Correios");
+      setPostingId(null);
+      setTracking("");
+      qc.invalidateQueries({ queryKey: ["orders"] });
+      qc.invalidateQueries({ queryKey: ["products"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -170,7 +193,14 @@ function OrdersPage() {
                     </p>
                   )}
                 </TableCell>
-                <TableCell className="text-muted-foreground">{o.neighborhood ?? "—"}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {o.neighborhood ?? "—"}
+                  {o.shipping_method === "correios" && (
+                    <Badge variant="secondary" className="ml-1.5">
+                      Correios
+                    </Badge>
+                  )}
+                </TableCell>
                 <TableCell className="text-right font-medium">{brl(Number(o.total))}</TableCell>
                 <TableCell>
                   <StatusBadge status={o.status} />
@@ -200,6 +230,17 @@ function OrdersPage() {
                         onClick={() => setPickingId(o.id)}
                       >
                         <PackageCheck className="mr-1.5 size-4" /> Separar
+                      </Button>
+                    )}
+
+                    {o.status === "picked" && o.shipping_method === "correios" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={postCorreios.isPending}
+                        onClick={() => setPostingId(o.id)}
+                      >
+                        <Send className="mr-1.5 size-4" /> Postar nos Correios
                       </Button>
                     )}
 
@@ -294,6 +335,35 @@ function OrdersPage() {
             : undefined
         }
       />
+      <Dialog open={!!postingId} onOpenChange={(v) => !v && setPostingId(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Postar nos Correios</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>Código de rastreio (opcional)</Label>
+            <Input
+              value={tracking}
+              onChange={(e) => setTracking(e.target.value)}
+              placeholder="AA123456789BR"
+            />
+            <p className="text-xs text-muted-foreground">
+              O pedido sai da fila e é dado como entregue; o estoque reservado é baixado.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setPostingId(null)}>
+              Voltar
+            </Button>
+            <Button
+              disabled={postCorreios.isPending}
+              onClick={() => postingId && postCorreios.mutate({ id: postingId, tracking })}
+            >
+              Confirmar postagem
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <ReceiptSheet saleId={printingId} onClose={() => setPrintingId(null)} />
     </AppShell>
   );

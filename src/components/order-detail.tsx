@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { brl, dateTimeFull } from "@/lib/format";
+import { methodWithInstallments } from "@/lib/fees";
 import type { Database } from "@/integrations/supabase/types";
 
 type Status = Database["public"]["Enums"]["order_status"];
@@ -89,7 +90,14 @@ export function OrderDetail({
   const discount = Number(sale?.discount ?? 0);
   const total = Number(sale?.total ?? 0);
   // mesma conta do recibo: taxa cobrada = o que o total tem a mais que os produtos
-  const fee = Math.max(0, Math.round((total - Math.max(subtotal - discount, 0)) * 100) / 100);
+  // taxa da maquininha (débito/crédito) já está dentro de total
+  const cardFee =
+    Math.round((Number(sale?.surcharge_1 ?? 0) + Number(sale?.surcharge_2 ?? 0)) * 100) / 100;
+  const inst = Number(sale?.installments ?? 1);
+  const fee = Math.max(
+    0,
+    Math.round((total - cardFee - Math.max(subtotal - discount, 0)) * 100) / 100,
+  );
   const deliveryNotes = sale?.delivery_address ? c?.notes : null;
 
   return (
@@ -195,8 +203,14 @@ export function OrderDetail({
                 )}
                 {fee > 0 && (
                   <div className="flex justify-between text-muted-foreground">
-                    <span>Taxa de entrega</span>
+                    <span>{sale.shipping_method === "correios" ? "Frete Correios" : "Taxa de entrega"}</span>
                     <span>{brl(fee)}</span>
+                  </div>
+                )}
+                {cardFee > 0 && (
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Taxa do cartão</span>
+                    <span>{brl(cardFee)}</span>
                   </div>
                 )}
                 <div className="flex justify-between border-t border-border pt-1 font-semibold">
@@ -207,10 +221,16 @@ export function OrderDetail({
                   <span>Pagamento</span>
                   <span className="text-right">
                     {sale.payment_method_2
-                      ? `${sale.payment_method} ${brl(total - Number(sale.payment_amount_2))} + ${sale.payment_method_2} ${brl(Number(sale.payment_amount_2))}`
-                      : sale.payment_method}
+                      ? `${methodWithInstallments(sale.payment_method, inst)} ${brl(total - Number(sale.payment_amount_2) - Number(sale.surcharge_2 ?? 0))} + ${methodWithInstallments(sale.payment_method_2, inst)} ${brl(Number(sale.payment_amount_2) + Number(sale.surcharge_2 ?? 0))}`
+                      : methodWithInstallments(sale.payment_method, inst)}
                   </span>
                 </div>
+                {sale.tracking_code && (
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Rastreio Correios</span>
+                    <span>{sale.tracking_code}</span>
+                  </div>
+                )}
                 {sale.paid_at && (
                   <div className="flex justify-between text-muted-foreground">
                     <span>Pago no lançamento</span>

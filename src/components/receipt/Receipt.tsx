@@ -8,6 +8,10 @@ export type ReceiptSale = {
   discount: number;
   subtotal: number;
   delivery_fee: number;
+  // taxa da maquininha cobrada do cliente (débito/crédito), já dentro de total
+  card_fee: number;
+  shipping_method: string | null;
+  tracking_code: string | null;
   total: number;
   neighborhood: string | null;
   delivery_address: string | null;
@@ -134,8 +138,14 @@ export const Receipt = forwardRef<
         )}
         {sale.delivery_fee > 0 && (
           <div className="flex justify-between">
-            <span>Taxa de entrega</span>
+            <span>{sale.shipping_method === "correios" ? "Frete Correios" : "Taxa de entrega"}</span>
             <span>{brl(sale.delivery_fee)}</span>
+          </div>
+        )}
+        {sale.card_fee > 0 && (
+          <div className="flex justify-between">
+            <span>Taxa do cartão</span>
+            <span>{brl(sale.card_fee)}</span>
           </div>
         )}
         <div className="mt-1 flex justify-between text-sm font-bold">
@@ -146,6 +156,12 @@ export const Receipt = forwardRef<
           <span>Pagamento</span>
           <span className="capitalize">{sale.payment_method}</span>
         </div>
+        {sale.tracking_code && (
+          <div className="mt-1 flex justify-between">
+            <span>Rastreio</span>
+            <span>{sale.tracking_code}</span>
+          </div>
+        )}
 
         <div className="my-2 border-t border-dashed border-black" />
         <p className="text-center">Obrigado pela preferência!</p>

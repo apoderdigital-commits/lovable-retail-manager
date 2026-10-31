@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Receipt, type ReceiptItem, type ReceiptSale } from "@/components/receipt/Receipt";
 import { renderReceiptCanvas } from "@/components/receipt/receipt-canvas";
+import { methodWithInstallments } from "@/lib/fees";
 import { brl } from "@/lib/format";
 
 // 1mm ~= 3.78px a 96dpi. "auto" (impressora comum) fica com uma largura de
@@ -50,21 +51,35 @@ export function ReceiptSheet({ saleId, onClose }: { saleId: string | null; onClo
     const subtotal = Number(sale.subtotal);
     const discount = Number(sale.discount);
     const total = Number(sale.total);
+    // taxa da maquininha (débito/crédito) já está dentro de total
+    const s1 = Number(sale.surcharge_1 ?? 0);
+    const s2 = Number(sale.surcharge_2 ?? 0);
+    const inst = Number(sale.installments ?? 1);
+    // o que o cliente pagou em cada forma, taxa inclusa
+    const paid2 = Number(sale.payment_amount_2 ?? 0) + s2;
+    const paid1 = total - paid2;
     return {
       sale_number: sale.sale_number,
       created_at: sale.created_at,
-      // pagamento dividido na entrega: "pix R$ 60,00 + dinheiro R$ 40,00"
+      // pagamento dividido na entrega: "pix R$ 60,00 + crédito 3x R$ 40,00"
       // pago no lançamento: o recibo diz que não há nada a cobrar na entrega
       payment_method:
         (sale.payment_method_2
-          ? `${sale.payment_method} ${brl(total - Number(sale.payment_amount_2))} + ${sale.payment_method_2} ${brl(Number(sale.payment_amount_2))}`
-          : sale.payment_method) + (sale.paid_at ? " · pago" : ""),
+          ? `${methodWithInstallments(sale.payment_method, inst)} ${brl(paid1)} + ${methodWithInstallments(sale.payment_method_2, inst)} ${brl(paid2)}`
+          : methodWithInstallments(sale.payment_method, inst)) + (sale.paid_at ? " · pago" : ""),
       discount,
       subtotal,
-      // taxa cobrada do cliente = o que o total tem a mais que os produtos.
-      // pedido antigo guardava em delivery_fee só o pagamento do entregador,
-      // sem somar no total — por isso não dá pra ler a coluna direto
-      delivery_fee: Math.max(0, Math.round((total - Math.max(subtotal - discount, 0)) * 100) / 100),
+      // taxa cobrada do cliente = o que o total tem a mais que os produtos e
+      // a taxa do cartão. pedido antigo guardava em delivery_fee só o
+      // pagamento do entregador, sem somar no total — por isso não dá pra
+      // ler a coluna direto
+      delivery_fee: Math.max(
+        0,
+        Math.round((total - s1 - s2 - Math.max(subtotal - discount, 0)) * 100) / 100,
+      ),
+      card_fee: Math.round((s1 + s2) * 100) / 100,
+      shipping_method: sale.shipping_method ?? null,
+      tracking_code: sale.tracking_code ?? null,
       total,
       neighborhood: sale.neighborhood,
       delivery_address: sale.delivery_address,

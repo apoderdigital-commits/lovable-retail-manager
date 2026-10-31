@@ -151,7 +151,10 @@ function DeliveriesPage() {
       ? Number(o.delivery_fee)
       : Number(fees.find((f) => f.neighborhood === o.neighborhood)?.amount ?? 0);
 
-  const queue = orders.filter((o) => o.status === "picked" && !o.route_id);
+  // pedido por Correios não vai pra rota: é postado na tela de Pedidos
+  const queue = orders.filter(
+    (o) => o.status === "picked" && !o.route_id && o.shipping_method !== "correios",
+  );
   // esperando a loja mandar de volta pra fila: agendado pra hoje (ou antes)
   // e não entregue. Os dois guardam a rota antiga, por isso não entram em
   // `queue` nem em `stopsOf` até alguém clicar em "Pra fila".

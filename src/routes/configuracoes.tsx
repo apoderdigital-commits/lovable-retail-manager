@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { KeyRound, RefreshCw, Lock, Check, Link2, MessageCircle, Tags } from "lucide-react";
+import { KeyRound, RefreshCw, Lock, Check, Link2, MessageCircle, Tags, Percent } from "lucide-react";
+import { INSTALLMENTS, type FeeRow } from "@/lib/fees";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { toast } from "sonner";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -194,6 +195,41 @@ function SettingsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // taxas da maquininha: débito/crédito cobradas do cliente, pix por conta da loja
+  const { data: fees = [] } = useQuery({
+    queryKey: ["payment-fees"],
+    queryFn: async () => {
+      const { data, error } = await db
+        .from("payment_fees")
+        .select("method, installments, rate_pct")
+        .order("method")
+        .order("installments");
+      if (error) throw error;
+      return (data ?? []) as FeeRow[];
+    },
+  });
+  const saveFee = useMutation({
+    mutationFn: async (row: FeeRow) => {
+      const { error } = await db
+        .from("payment_fees")
+        .upsert({ ...row, updated_at: new Date().toISOString() }, { onConflict: "method,installments" });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Taxa salva");
+      qc.invalidateQueries({ queryKey: ["payment-fees"] });
+      qc.invalidateQueries({ queryKey: ["finance"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const feeOf = (method: string, n = 1) =>
+    fees.find((f) => f.method === method && f.installments === n)?.rate_pct;
+  const FEE_SLOTS = [
+    { method: "pix", installments: 1, label: "Pix (loja paga)" },
+    { method: "débito", installments: 1, label: "Débito" },
+    ...INSTALLMENTS.map((n) => ({ method: "crédito", installments: n, label: `Crédito ${n}x` })),
+  ];
+
   const { data: categories = [] } = useQuery({
     queryKey: ["product-categories"],
     queryFn: async () => {
@@ -341,6 +377,44 @@ function SettingsPage() {
               </p>
             </div>
           )}
+        </section>
+
+        <section className="panel p-4 lg:col-span-2">
+          <div className="mb-1 flex items-center gap-2">
+            <Percent className="size-4 text-muted-foreground" />
+            <h2 className="text-sm font-semibold">Taxas da maquininha</h2>
+          </div>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Débito e crédito (1x a 18x) são somados em cima do valor e cobrados do cliente, no PDV
+            e na entrega. Pix não é cobrado do cliente: fica por conta da loja. Todas entram em
+            "Impostos" no Financeiro.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {FEE_SLOTS.map((f) => {
+              const current = feeOf(f.method, f.installments);
+              return (
+                <div key={`${f.method}-${f.installments}-${current ?? "x"}`} className="space-y-1">
+                  <Label className="text-xs">{f.label}</Label>
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      className="h-8"
+                      defaultValue={current ?? ""}
+                      placeholder="0,00"
+                      onBlur={(e) => {
+                        const v = Number(e.target.value.replace(",", ".") || 0);
+                        if (v !== Number(current ?? -1)) {
+                          saveFee.mutate({ method: f.method, installments: f.installments, rate_pct: v });
+                        }
+                      }}
+                    />
+                    <span className="text-xs text-muted-foreground">%</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </section>
 
         <section className="panel p-4 lg:col-span-2">
