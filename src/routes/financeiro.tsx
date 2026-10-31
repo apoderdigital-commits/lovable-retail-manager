@@ -192,6 +192,12 @@ function FinancePage() {
             hint="taxas da maquininha: pix por conta da loja, débito e crédito repassados"
           />
           <Line label="Tráfego" value={-Number(s?.custo_trafego ?? 0)} hint={trafegoHint} />
+          <Line
+            label="Custos totais"
+            value={-custos}
+            hint="produtos + motoboy + Correios + impostos + tráfego"
+            strong
+          />
           <div className="flex items-center justify-between px-4 py-3">
             <div>
               <p className="font-display text-base font-semibold">Lucro</p>
