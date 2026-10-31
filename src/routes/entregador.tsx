@@ -8,6 +8,7 @@ import {
   Flag,
   MapPin,
   Check,
+  BadgeCheck,
   ChevronUp,
   ChevronDown,
   ListOrdered,
@@ -459,6 +460,8 @@ type Stop = {
   payment_method_2: string | null;
   payment_amount_2: number;
   pix_to?: "maquina" | "entregador" | null;
+  // pago no lançamento: não cobra na entrega, só foto
+  paid_at?: string | null;
   delivery_address: string | null;
   neighborhood: string | null;
   city: string | null;
@@ -488,6 +491,7 @@ function StopCard({
   // pagamento na hora da entrega: o cliente pode trocar a forma ou dividir
   // em duas (ex.: parte no pix, parte em dinheiro)
   const total = Number(stop.total);
+  const paid = !!stop.paid_at;
   const [pay1, setPay1] = useState(stop.payment_method);
   const [split, setSplit] = useState(!!stop.payment_method_2);
   const [pay2, setPay2] = useState(stop.payment_method_2 ?? "pix");
@@ -495,21 +499,22 @@ function StopCard({
     stop.payment_method_2 ? String(stop.payment_amount_2) : "",
   );
   const value2 = Number(amount2.replace(",", ".") || 0);
-  const splitInvalid = split && (pay2 === pay1 || value2 <= 0 || value2 >= total);
+  const splitInvalid = !paid && split && (pay2 === pay1 || value2 <= 0 || value2 >= total);
   // pix: caiu na máquina (loja) ou na chave do entregador (entra no acerto)
   const hasPix = pay1 === "pix" || (split && pay2 === "pix");
   const [pixTo, setPixTo] = useState<"maquina" | "entregador" | "">(stop.pix_to ?? "");
-  const pixMissing = hasPix && !pixTo;
+  const pixMissing = !paid && hasPix && !pixTo;
   const paymentChanged =
-    pay1 !== stop.payment_method ||
-    (split ? pay2 : null) !== (stop.payment_method_2 ?? null) ||
-    (split ? value2 : 0) !== Number(stop.payment_amount_2 ?? 0) ||
-    (hasPix ? pixTo : null) !== (stop.pix_to ?? null);
+    !paid &&
+    (pay1 !== stop.payment_method ||
+      (split ? pay2 : null) !== (stop.payment_method_2 ?? null) ||
+      (split ? value2 : 0) !== Number(stop.payment_amount_2 ?? 0) ||
+      (hasPix ? pixTo : null) !== (stop.pix_to ?? null));
 
   const run = useMutation({
     mutationFn: async () => {
       if (action === "deliver") {
-        if (!file) throw new Error("Envie a foto do comprovante");
+        if (!file) throw new Error(paid ? "Envie a foto da entrega" : "Envie a foto do comprovante");
         if (!user) throw new Error("Sessão expirada");
         if (splitInvalid) throw new Error("Confira as duas formas de pagamento");
         if (pixMissing) throw new Error("Informe onde o pix caiu");
@@ -585,6 +590,11 @@ function StopCard({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          {paid && (
+            <Badge className="gap-1">
+              <BadgeCheck className="size-3" /> Pago
+            </Badge>
+          )}
           <Badge variant="secondary">#{stop.sale_number}</Badge>
           {(onUp || onDown) && (
             <div className="flex flex-col">
@@ -620,8 +630,9 @@ function StopCard({
       <div className="mt-3 flex items-center justify-between">
         <span className="font-display text-lg font-semibold">{brl(Number(stop.total))}</span>
         <span className="text-sm text-muted-foreground">
-          {stop.payment_method}
-          {stop.payment_method_2 ? ` + ${stop.payment_method_2}` : ""}
+          {paid
+            ? `já pago (${stop.payment_method})`
+            : `${stop.payment_method}${stop.payment_method_2 ? ` + ${stop.payment_method_2}` : ""}`}
         </span>
       </div>
 
@@ -660,6 +671,15 @@ function StopCard({
 
           {action === "deliver" && (
             <div className="space-y-4">
+              {paid && (
+                <div className="rounded-md border border-border bg-muted px-3 py-2 text-sm">
+                  <p className="font-medium">Pedido já pago no lançamento</p>
+                  <p className="text-xs text-muted-foreground">
+                    Não cobre nada. Só tire a foto da entrega e confirme.
+                  </p>
+                </div>
+              )}
+              {!paid && (
               <div className="space-y-2">
                 <Label>Forma de pagamento</Label>
                 <Select value={pay1} onValueChange={setPay1}>
@@ -747,9 +767,10 @@ function StopCard({
                   </div>
                 )}
               </div>
+              )}
 
               <div className="space-y-2">
-                <Label>Foto do comprovante</Label>
+                <Label>{paid ? "Foto da entrega" : "Foto do comprovante"}</Label>
                 {/* sem "capture": o celular oferece tirar foto agora ou
                     escolher uma da galeria */}
                 <Input
@@ -758,8 +779,9 @@ function StopCard({
                   onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Tire a foto na hora ou escolha da galeria. Sem a foto a entrega não é concluída.
-                  Vale o comprovante de pagamento ou a nota assinada.
+                  {paid
+                    ? "Tire a foto do produto entregue, na mão do cliente ou no local. Sem a foto a entrega não é concluída."
+                    : "Tire a foto na hora ou escolha da galeria. Sem a foto a entrega não é concluída. Vale o comprovante de pagamento ou a nota assinada."}
                 </p>
               </div>
             </div>

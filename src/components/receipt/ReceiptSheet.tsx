@@ -54,9 +54,11 @@ export function ReceiptSheet({ saleId, onClose }: { saleId: string | null; onClo
       sale_number: sale.sale_number,
       created_at: sale.created_at,
       // pagamento dividido na entrega: "pix R$ 60,00 + dinheiro R$ 40,00"
-      payment_method: sale.payment_method_2
-        ? `${sale.payment_method} ${brl(total - Number(sale.payment_amount_2))} + ${sale.payment_method_2} ${brl(Number(sale.payment_amount_2))}`
-        : sale.payment_method,
+      // pago no lançamento: o recibo diz que não há nada a cobrar na entrega
+      payment_method:
+        (sale.payment_method_2
+          ? `${sale.payment_method} ${brl(total - Number(sale.payment_amount_2))} + ${sale.payment_method_2} ${brl(Number(sale.payment_amount_2))}`
+          : sale.payment_method) + (sale.paid_at ? " · pago" : ""),
       discount,
       subtotal,
       // taxa cobrada do cliente = o que o total tem a mais que os produtos.

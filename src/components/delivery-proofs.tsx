@@ -17,6 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { brl, dayBr } from "@/lib/format";
+import { BadgeCheck } from "lucide-react";
 
 type ProofRow = {
   id: string;
@@ -26,6 +27,7 @@ type ProofRow = {
   payment_method_2: string | null;
   payment_amount_2: number;
   pix_to: "maquina" | "entregador" | null;
+  paid_at: string | null;
   proof_url: string | null;
   customers: { name: string } | null;
   routes: { date: string; courier_id: string };
@@ -58,7 +60,7 @@ export function DeliveryProofs({
       let q = supabase
         .from("sales")
         .select(
-          "id, sale_number, total, payment_method, payment_method_2, payment_amount_2, pix_to, proof_url, customers(name), routes!inner(date, courier_id)",
+          "id, sale_number, total, payment_method, payment_method_2, payment_amount_2, pix_to, paid_at, proof_url, customers(name), routes!inner(date, courier_id)",
         )
         .eq("status", "delivered")
         .gte("routes.date", from)
@@ -136,6 +138,11 @@ export function DeliveryProofs({
                 <TableCell>{r.customers?.name ?? "Consumidor final"}</TableCell>
                 <TableCell>
                   <div className="flex flex-wrap gap-1">
+                    {r.paid_at ? (
+                      <Badge className="gap-1">
+                        <BadgeCheck className="size-3" /> Pago na loja
+                      </Badge>
+                    ) : (
                     <Badge
                       variant={r.payment_method === "pix" && r.pix_to === "entregador" ? "default" : "secondary"}
                       className="capitalize"
@@ -143,7 +150,8 @@ export function DeliveryProofs({
                       {methodLabel(r.payment_method, r.pix_to)}
                       {r.payment_method_2 ? ` ${brl(Number(r.total) - second)}` : ""}
                     </Badge>
-                    {r.payment_method_2 && (
+                    )}
+                    {!r.paid_at && r.payment_method_2 && (
                       <Badge
                         variant={
                           r.payment_method_2 === "pix" && r.pix_to === "entregador" ? "default" : "secondary"

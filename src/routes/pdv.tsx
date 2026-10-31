@@ -76,6 +76,9 @@ function PdvPage() {
   const [origin, setOrigin] = useState<Origin>("organic");
   const [customerId, setCustomerId] = useState("none");
   const [payment, setPayment] = useState("dinheiro");
+  // pagamento já confirmado no lançamento: o motoboy não cobra na entrega,
+  // só tira a foto. O banco grava em sales.paid_at.
+  const [paid, setPaid] = useState(false);
   const [discount, setDiscount] = useState("0");
   const [address, setAddress] = useState("");
   const [neighborhood, setNeighborhood] = useState("");
@@ -261,6 +264,7 @@ function PdvPage() {
     setNeighborhood("");
     setCity("");
     setNotes("");
+    setPaid(false);
   };
 
   const finish = useMutation({
@@ -281,6 +285,8 @@ function PdvPage() {
         p_is_traffic: origin === "traffic",
         p_discount: discountValue,
         p_counter_sale: counterSale,
+        // só manda quando marcado: venda de balcão já é paga na hora
+        ...(paid && !counterSale ? { p_paid: true } : {}),
         ...(notes.trim() ? { p_notes: notes.trim() } : {}),
       });
 
@@ -629,6 +635,23 @@ function PdvPage() {
                 />
               </div>
             </div>
+
+            {mode === "delivery" && (
+              <label className="flex items-start gap-2 rounded-md border border-border p-3 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={paid}
+                  onChange={(e) => setPaid(e.target.checked)}
+                />
+                <span>
+                  <span className="font-medium">Pagamento confirmado</span>
+                  <span className="block text-xs text-muted-foreground">
+                    O cliente já pagou ({payment}). O motoboy não cobra na entrega, só tira a foto.
+                  </span>
+                </span>
+              </label>
+            )}
 
             <div className="space-y-1.5">
               <Label>Observação do pedido</Label>

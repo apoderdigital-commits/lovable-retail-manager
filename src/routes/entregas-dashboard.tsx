@@ -3,7 +3,16 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { useReactToPrint } from "react-to-print";
-import { Wallet, Landmark, CreditCard, Receipt, Printer, Smartphone, HandCoins } from "lucide-react";
+import {
+  Wallet,
+  Landmark,
+  CreditCard,
+  Receipt,
+  Printer,
+  Smartphone,
+  HandCoins,
+  BadgeCheck,
+} from "lucide-react";
 import { DeliveryProofs } from "@/components/delivery-proofs";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell, Metric } from "@/components/AppShell";
@@ -61,6 +70,8 @@ type PaymentBreakdown = {
 const CATEGORY: Record<string, string> = {
   "pix máquina": "Pix máquina",
   "pix entregador": "Pix entregador",
+  // pago no lançamento do pedido: o entregador só entregou, não recebeu
+  "pago na loja": "Pago na loja",
   pix: "Pix sem destino",
   dinheiro: "Espécie",
   "débito": "Cartão",
@@ -183,12 +194,14 @@ function DeliveriesDashboardPage() {
     "Pix entregador",
     "Espécie",
     "Cartão",
+    ...(byCategory["Pago na loja"] ? ["Pago na loja"] : []),
     ...(byCategory["Pix sem destino"] ? ["Pix sem destino"] : []),
     ...(byCategory["Outros"] ? ["Outros"] : []),
   ];
   const CATEGORY_ICON: Record<string, typeof Wallet> = {
     "Pix máquina": Landmark,
     "Pix entregador": Smartphone,
+    "Pago na loja": BadgeCheck,
     "Pix sem destino": Landmark,
     Espécie: Wallet,
     Cartão: CreditCard,

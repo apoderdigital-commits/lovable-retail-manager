@@ -211,6 +211,12 @@ export function OrderDetail({
                       : sale.payment_method}
                   </span>
                 </div>
+                {sale.paid_at && (
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Pago no lançamento</span>
+                    <span>{dateTimeFull(sale.paid_at)}</span>
+                  </div>
+                )}
               </div>
             </section>
 

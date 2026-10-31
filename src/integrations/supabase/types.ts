@@ -571,6 +571,7 @@ export type Database = {
           payment_amount_2: number
           payment_method: string
           payment_method_2: string | null
+          paid_at: string | null
           proof_url: string | null
           reason: string | null
           route_id: string | null
@@ -600,6 +601,7 @@ export type Database = {
           payment_amount_2?: number
           payment_method?: string
           payment_method_2?: string | null
+          paid_at?: string | null
           proof_url?: string | null
           reason?: string | null
           route_id?: string | null
@@ -629,6 +631,7 @@ export type Database = {
           payment_amount_2?: number
           payment_method?: string
           payment_method_2?: string | null
+          paid_at?: string | null
           proof_url?: string | null
           reason?: string | null
           route_id?: string | null
@@ -763,6 +766,7 @@ export type Database = {
           p_neighborhood?: string
           p_notes?: string
           p_offer?: string
+          p_paid?: boolean
           p_payment_method: string
         }
         Returns: {
@@ -782,6 +786,7 @@ export type Database = {
           payment_amount_2: number
           payment_method: string
           payment_method_2: string | null
+          paid_at: string | null
           proof_url: string | null
           reason: string | null
           route_id: string | null
@@ -941,6 +946,7 @@ export type Database = {
           payment_amount_2: number
           payment_method: string
           payment_method_2: string | null
+          paid_at: string | null
           proof_url: string | null
           reason: string | null
           route_id: string | null
