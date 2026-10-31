@@ -117,7 +117,7 @@ function FinancePage() {
   return (
     <AppShell
       title="Financeiro"
-      subtitle={s ? `${s.pedidos} pedido(s) entregue(s) no período` : "Carregando..."}
+      subtitle={s ? `${s.pedidos} pedido(s) no período, sem as canceladas` : "Carregando..."}
       actions={
         isAdmin ? (
           <Button variant="outline" size="sm" asChild>
@@ -228,7 +228,7 @@ function FinancePage() {
             {rows.length === 0 && (
               <TableRow>
                 <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
-                  Nenhuma venda entregue no período.
+                  Nenhuma venda no período.
                 </TableCell>
               </TableRow>
             )}

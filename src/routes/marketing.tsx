@@ -424,7 +424,7 @@ function MarketingPage() {
             {ltv.length === 0 && (
               <TableRow>
                 <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
-                  Ainda não há vendas entregues para calcular.
+                  Ainda não há vendas para calcular.
                 </TableCell>
               </TableRow>
             )}
