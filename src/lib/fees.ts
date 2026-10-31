@@ -20,7 +20,8 @@ export function surchargeFor(fees: FeeRow[], method: string, installments: numbe
   return Math.round(base * feePct(fees, method, installments)) / 100;
 }
 
-/** "crédito 5x" / "débito" / "pix" — como aparece em recibo e ficha */
+/** "crédito 5x" (sempre com as parcelas, "1x" inclusive) / "débito" / "pix" —
+ *  como aparece em recibo e ficha; o motoboy precisa ver em quantas vezes passar */
 export function methodWithInstallments(method: string, installments: number) {
-  return method === "crédito" && installments > 1 ? `${method} ${installments}x` : method;
+  return method === "crédito" ? `${method} ${Math.max(1, installments || 1)}x` : method;
 }
