@@ -25,7 +25,7 @@ export const Route = createFileRoute("/financeiro")({
       { title: "Financeiro — Vieira Perfumes" },
       {
         name: "description",
-        content: "Faturamento menos custo de produto, motoboy, tráfego e folha, com a margem.",
+        content: "Faturamento menos custo de produto, motoboy e tráfego, com a margem.",
       },
     ],
   }),
@@ -118,12 +118,13 @@ function FinancePage() {
   // produto vendido sem custo no cadastro entra como zero e esconde margem
   const semCusto = byProduct.filter((p) => Number(p.unit_cost) === 0);
 
+  // lucro = faturamento menos produto, motoboy e tráfego. Custo fixo rateado
+  // saiu da tela a pedido do usuário (31/10/2026) e não entra na conta.
   const receita = Number(s?.receita ?? 0);
   const custos =
     Number(s?.custo_produto ?? 0) +
     Number(s?.custo_motoboy ?? 0) +
-    Number(s?.custo_trafego ?? 0) +
-    Number(s?.custo_fixo ?? 0);
+    Number(s?.custo_trafego ?? 0);
   const lucro = receita - custos;
   const margem = receita > 0 ? (lucro / receita) * 100 : null;
 
@@ -177,11 +178,6 @@ function FinancePage() {
           />
           <Line label="Motoboy" value={-Number(s?.custo_motoboy ?? 0)} hint="taxas devidas" />
           <Line label="Tráfego" value={-Number(s?.custo_trafego ?? 0)} hint={trafegoHint} />
-          <Line
-            label="Custos fixos"
-            value={-Number(s?.custo_fixo ?? 0)}
-            hint={`rateado por ${s?.dias ?? 0} dia(s)`}
-          />
           <div className="flex items-center justify-between px-4 py-3">
             <div>
               <p className="font-display text-base font-semibold">Lucro</p>
