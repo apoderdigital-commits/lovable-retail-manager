@@ -32,18 +32,29 @@ function Dashboard() {
       const startOfDay = dayStart(todayISO());
       const startOfMonth = dayStart(monthStartISO());
 
+      // faturamento segue a regra do Histórico de Vendas: venda cancelada
+      // não conta. Os itens vendidos seguem a mesma regra, via status da venda.
       const [today, month, products, recent, itemsToday] = await Promise.all([
-        supabase.from("sales").select("total").gte("created_at", startOfDay),
-        supabase.from("sales").select("total").gte("created_at", startOfMonth),
+        supabase
+          .from("sales")
+          .select("total")
+          .neq("status", "cancelled")
+          .gte("created_at", startOfDay),
+        supabase
+          .from("sales")
+          .select("total")
+          .neq("status", "cancelled")
+          .gte("created_at", startOfMonth),
         supabase.from("products").select("*").order("stock", { ascending: true }),
         supabase
           .from("sales")
-          .select("id, sale_number, total, payment_method, created_at, customers(name)")
+          .select("id, sale_number, total, payment_method, status, created_at, customers(name)")
           .order("created_at", { ascending: false })
           .limit(8),
         supabase
           .from("sale_items")
-          .select("product_id, quantity")
+          .select("product_id, quantity, sales!inner(status)")
+          .neq("sales.status", "cancelled")
           .gte("created_at", startOfDay),
       ]);
 
@@ -113,10 +124,18 @@ function Dashboard() {
           </header>
           <div className="divide-y divide-border">
             {(data?.recent ?? []).map((sale) => (
-              <div key={sale.id} className="flex items-center justify-between px-4 py-3 text-sm">
+              <div
+                key={sale.id}
+                className={`flex items-center justify-between px-4 py-3 text-sm${
+                  sale.status === "cancelled" ? " opacity-50" : ""
+                }`}
+              >
                 <div>
                   <p className="font-medium">
                     #{sale.sale_number} · {sale.customers?.name ?? "Consumidor final"}
+                    {sale.status === "cancelled" && (
+                      <span className="ml-2 text-xs font-normal text-destructive">Cancelada</span>
+                    )}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {dateTime(sale.created_at)} · {sale.payment_method}

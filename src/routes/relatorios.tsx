@@ -45,16 +45,23 @@ function ReportsPage() {
   const { data } = useQuery({
     queryKey: ["reports", from, to],
     queryFn: async () => {
+      // faturamento segue a regra do Histórico de Vendas: venda cancelada
+      // não conta. Os itens (produtos campeões, categorias) seguem a mesma
+      // regra, filtrados pelo status da venda.
       const [salesRes, itemsRes] = await Promise.all([
         supabase
           .from("sales")
           .select("id, sale_number, total, discount, payment_method, created_at")
+          .neq("status", "cancelled")
           .gte("created_at", dayStart(from))
           .lte("created_at", dayEnd(to))
           .order("created_at", { ascending: false }),
         supabase
           .from("sale_items")
-          .select("product_name, quantity, total, created_at, products(product_categories(name))")
+          .select(
+            "product_name, quantity, total, created_at, sales!inner(status), products(product_categories(name))",
+          )
+          .neq("sales.status", "cancelled")
           .gte("created_at", dayStart(from))
           .lte("created_at", dayEnd(to)),
       ]);
