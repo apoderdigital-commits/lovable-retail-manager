@@ -85,15 +85,19 @@ function CustomersPage() {
   });
 
   const remove = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("customers").delete().eq("id", id);
+    mutationFn: async (c: { id: string; name: string }) => {
+      if (!window.confirm(`Excluir o cliente "${c.name}"? As vendas dele continuam no histórico, mas sem o cliente ligado.`)) return false;
+      const { data, error } = await supabase.from("customers").delete().eq("id", c.id).select("id");
       if (error) throw error;
+      if (!data?.length) throw new Error("seu usuário não tem permissão para excluir clientes.");
+      return true;
     },
-    onSuccess: () => {
+    onSuccess: (ok) => {
+      if (!ok) return;
       toast.success("Cliente excluído");
       qc.invalidateQueries({ queryKey: ["customers"] });
     },
-    onError: () => toast.error("Não foi possível excluir o cliente"),
+    onError: (e: Error) => toast.error("Não foi possível excluir o cliente: " + e.message),
   });
 
   const filtered = customers.filter((c) =>
@@ -186,7 +190,7 @@ function CustomersPage() {
                     <Pencil className="size-4" />
                   </Button>
                   {isAdmin && (
-                    <Button variant="ghost" size="icon" onClick={() => remove.mutate(c.id)}>
+                    <Button variant="ghost" size="icon" disabled={remove.isPending} onClick={() => remove.mutate({ id: c.id, name: c.name })}>
                       <Trash2 className="size-4 text-destructive" />
                     </Button>
                   )}

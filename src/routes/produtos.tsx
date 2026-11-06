@@ -99,7 +99,8 @@ function ProductsPage() {
   const { data: products = [] } = useQuery({
     queryKey: ["products"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("products").select("*").order("name");
+      // Arquivados (excluídos que tinham histórico) não aparecem.
+      const { data, error } = await supabase.from("products").select("*").eq("active", true).order("name");
       if (error) throw error;
       return data;
     },
@@ -153,15 +154,28 @@ function ProductsPage() {
   });
 
   const remove = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("products").delete().eq("id", id);
-      if (error) throw error;
+    mutationFn: async (p: { id: string; name: string }) => {
+      if (!window.confirm(`Excluir "${p.name}"?`)) return "cancelado" as const;
+      const { data: apagados, error } = await supabase.from("products").delete().eq("id", p.id).select("id");
+      // Sem erro e sem linha apagada = o banco não deixou (só admin exclui).
+      if (!error && !apagados?.length) throw new Error("seu usuário não tem permissão para excluir produtos.");
+      if (!error) return "excluido" as const;
+      // 23503 = o produto aparece em vendas, trocas ou movimentos de estoque.
+      if (error.code !== "23503") throw error;
+      const { error: e2 } = await supabase.from("products").update({ active: false }).eq("id", p.id);
+      if (e2) throw e2;
+      return "arquivado" as const;
     },
-    onSuccess: () => {
-      toast.success("Produto excluído");
+    onSuccess: (r) => {
+      if (r === "cancelado") return;
+      toast.success(
+        r === "excluido"
+          ? "Produto excluído"
+          : "Produto arquivado: ele tem vendas no histórico, então sai da lista e do PDV, mas o histórico fica.",
+      );
       qc.invalidateQueries({ queryKey: ["products"] });
     },
-    onError: () => toast.error("Não foi possível excluir o produto"),
+    onError: (e: Error) => toast.error("Não foi possível excluir o produto: " + e.message),
   });
 
   // "none" representa produto sem categoria, pra também dar pra filtrar por ele
@@ -482,7 +496,7 @@ function ProductsPage() {
                     <Pencil className="size-4" />
                   </Button>
                   {isAdmin && (
-                    <Button variant="ghost" size="icon" onClick={() => remove.mutate(p.id)}>
+                    <Button variant="ghost" size="icon" disabled={remove.isPending} onClick={() => remove.mutate({ id: p.id, name: p.name })}>
                       <Trash2 className="size-4 text-destructive" />
                     </Button>
                   )}
@@ -554,14 +568,18 @@ function CategoriesManager({ categories }: { categories: Category[] }) {
 
   const remove = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("product_categories").delete().eq("id", id);
+      if (!window.confirm("Excluir esta categoria? Os produtos dela ficam sem categoria.")) return false;
+      const { data, error } = await supabase.from("product_categories").delete().eq("id", id).select("id");
       if (error) throw error;
+      if (!data?.length) throw new Error("seu usuário não tem permissão para excluir categorias.");
+      return true;
     },
-    onSuccess: () => {
+    onSuccess: (ok) => {
+      if (!ok) return;
       toast.success("Categoria excluída");
       refresh();
     },
-    onError: () => toast.error("Não foi possível excluir a categoria"),
+    onError: (e: Error) => toast.error("Não foi possível excluir a categoria: " + e.message),
   });
 
   return (

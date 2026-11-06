@@ -992,7 +992,7 @@ function StopCard({
             </div>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="sticky -bottom-6 -mx-6 -mb-6 gap-2 border-t border-border bg-background px-6 py-3">
             <Button variant="ghost" onClick={() => setAction(null)}>
               Voltar
             </Button>

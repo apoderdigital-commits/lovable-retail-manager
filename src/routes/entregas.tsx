@@ -681,8 +681,10 @@ function ZoneSettings() {
 
   const remover = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("delivery_zones").delete().eq("id", id);
+      if (!window.confirm("Excluir esta região e a taxa dela?")) return;
+      const { data, error } = await supabase.from("delivery_zones").delete().eq("id", id).select("id");
       if (error) throw error;
+      if (!data?.length) throw new Error("Seu usuário não tem permissão para excluir regiões.");
     },
     onSuccess: refresh,
     onError: (e: Error) => toast.error(e.message),

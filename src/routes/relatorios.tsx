@@ -51,7 +51,7 @@ function ReportsPage() {
       const [salesRes, itemsRes] = await Promise.all([
         supabase
           .from("sales")
-          .select("id, sale_number, total, discount, payment_method, created_at")
+          .select("id, sale_number, total, discount, payment_method, payment_method_2, payment_amount_2, surcharge_2, created_at")
           .neq("status", "cancelled")
           .gte("created_at", dayStart(from))
           .lte("created_at", dayEnd(to))
@@ -80,7 +80,11 @@ function ReportsPage() {
 
   const byPayment = Object.entries(
     sales.reduce<Record<string, number>>((acc, s) => {
-      acc[s.payment_method] = (acc[s.payment_method] ?? 0) + Number(s.total);
+      // Pagamento dividido: a 2ª forma leva o valor dela mais a taxa dela; a
+      // 1ª fica com o resto do total (mesma conta do detalhe do pedido).
+      const parte2 = s.payment_method_2 ? Number(s.payment_amount_2 ?? 0) + Number(s.surcharge_2 ?? 0) : 0;
+      acc[s.payment_method] = (acc[s.payment_method] ?? 0) + Number(s.total) - parte2;
+      if (s.payment_method_2) acc[s.payment_method_2] = (acc[s.payment_method_2] ?? 0) + parte2;
       return acc;
     }, {}),
   ).sort((a, b) => b[1] - a[1]);
