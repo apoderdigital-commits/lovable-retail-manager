@@ -181,10 +181,10 @@ function MarketingPage() {
   const { data: trafficLoose } = useQuery({
     queryKey: ["marketing", "traffic-loose", from, to],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("traffic_loose_performance", {
+      const { data, error } = await supabase.rpc("traffic_loose_performance" as never, {
         p_from: from,
         p_to: to,
-      });
+      } as never);
       if (error) throw error;
       return (data ?? [])[0] as { sales_count: number; revenue: number; customers: number };
     },

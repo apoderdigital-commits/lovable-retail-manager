@@ -99,10 +99,10 @@ function FinancePage() {
   const { data: byProduct = [] } = useQuery({
     queryKey: ["finance", "by-product", from, to],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("product_cost_breakdown", {
+      const { data, error } = await supabase.rpc("product_cost_breakdown" as never, {
         p_from: from,
         p_to: to,
-      });
+      } as never);
       if (error) throw error;
       return (data ?? []) as ByProduct[];
     },
