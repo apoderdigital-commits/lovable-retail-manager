@@ -367,15 +367,17 @@ function SalesHistoryPage() {
                   </TableCell>
                   <TableCell className="text-center">
                     {s.notes || s.reason ? (
-                      <MessageSquare
-                        className="mx-auto size-4 text-muted-foreground"
+                      <span
+                        className="flex justify-center"
                         title={[
                           s.notes && `Observação: ${s.notes}`,
                           s.reason && `Motivo: ${s.reason}`,
                         ]
                           .filter(Boolean)
                           .join("\n")}
-                      />
+                      >
+                        <MessageSquare className="size-4 text-muted-foreground" />
+                      </span>
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}

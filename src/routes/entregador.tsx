@@ -206,7 +206,11 @@ function CourierPage() {
     const ids = stops.map((s) => s.id);
     const to = idx + delta;
     if (to < 0 || to >= ids.length) return;
-    [ids[idx], ids[to]] = [ids[to], ids[idx]];
+    const a = ids[idx];
+    const b = ids[to];
+    if (a === undefined || b === undefined) return;
+    ids[idx] = b;
+    ids[to] = a;
     reorder.mutate(ids);
   };
 
