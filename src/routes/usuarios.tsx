@@ -193,6 +193,9 @@ function UsersPage() {
                 <Label>E-mail</Label>
                 <Input
                   type="email"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   placeholder="nome@dominio.com"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
@@ -202,6 +205,10 @@ function UsersPage() {
                 <Label>Senha inicial</Label>
                 <Input
                   type="text"
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
                   placeholder="mínimo 8 caracteres"
