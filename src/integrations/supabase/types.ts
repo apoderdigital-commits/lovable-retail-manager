@@ -103,6 +103,88 @@ export type Database = {
         }
         Relationships: []
       }
+      crm_followups: {
+        Row: {
+          created_at: string
+          customer_id: string
+          id: number
+          message: string | null
+          offer_id: string | null
+          sale_id: string | null
+          sent_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          id?: never
+          message?: string | null
+          offer_id?: string | null
+          sale_id?: string | null
+          sent_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          id?: never
+          message?: string | null
+          offer_id?: string | null
+          sale_id?: string | null
+          sent_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_followups_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_followups_offer_id_fkey"
+            columns: ["offer_id"]
+            isOneToOne: false
+            referencedRelation: "offers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_followups_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_settings: {
+        Row: {
+          evolution_api_key: string | null
+          evolution_api_url: string | null
+          evolution_instance: string | null
+          followup_message: string | null
+          id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          evolution_api_key?: string | null
+          evolution_api_url?: string | null
+          evolution_instance?: string | null
+          followup_message?: string | null
+          id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          evolution_api_key?: string | null
+          evolution_api_url?: string | null
+          evolution_instance?: string | null
+          followup_message?: string | null
+          id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           address: string | null
@@ -172,6 +254,33 @@ export type Database = {
           amount?: number
           id?: string
           neighborhood?: string
+        }
+        Relationships: []
+      }
+      delivery_zones: {
+        Row: {
+          amount: number | null
+          city: string
+          created_at: string
+          id: string
+          neighborhood: string | null
+          serves: boolean
+        }
+        Insert: {
+          amount?: number | null
+          city: string
+          created_at?: string
+          id?: string
+          neighborhood?: string | null
+          serves?: boolean
+        }
+        Update: {
+          amount?: number | null
+          city?: string
+          created_at?: string
+          id?: string
+          neighborhood?: string | null
+          serves?: boolean
         }
         Relationships: []
       }
@@ -285,27 +394,54 @@ export type Database = {
       offers: {
         Row: {
           active: boolean
+          category_ids: string[]
           created_at: string
           id: string
           item_count: number
           name: string
           price: number
+          repurchase_days: number | null
         }
         Insert: {
           active?: boolean
+          category_ids?: string[]
           created_at?: string
           id?: string
           item_count: number
           name: string
           price: number
+          repurchase_days?: number | null
         }
         Update: {
           active?: boolean
+          category_ids?: string[]
           created_at?: string
           id?: string
           item_count?: number
           name?: string
           price?: number
+          repurchase_days?: number | null
+        }
+        Relationships: []
+      }
+      payment_fees: {
+        Row: {
+          installments: number
+          method: string
+          rate_pct: number
+          updated_at: string
+        }
+        Insert: {
+          installments?: number
+          method: string
+          rate_pct?: number
+          updated_at?: string
+        }
+        Update: {
+          installments?: number
+          method?: string
+          rate_pct?: number
+          updated_at?: string
         }
         Relationships: []
       }
@@ -437,32 +573,94 @@ export type Database = {
         }
         Relationships: []
       }
-      delivery_zones: {
+      sale_exchanges: {
         Row: {
-          amount: number | null
-          city: string
           created_at: string
+          customer_id: string | null
+          difference: number
+          difference_payment: string | null
+          given_name: string
+          given_product_id: string
+          given_qty: number
+          given_value: number
           id: string
-          neighborhood: string | null
-          serves: boolean
+          kind: string
+          notes: string | null
+          returned_name: string
+          returned_product_id: string
+          returned_qty: number
+          returned_value: number
+          sale_id: string
+          user_id: string | null
         }
         Insert: {
-          amount?: number | null
-          city: string
           created_at?: string
+          customer_id?: string | null
+          difference: number
+          difference_payment?: string | null
+          given_name: string
+          given_product_id: string
+          given_qty: number
+          given_value: number
           id?: string
-          neighborhood?: string | null
-          serves?: boolean
+          kind: string
+          notes?: string | null
+          returned_name: string
+          returned_product_id: string
+          returned_qty: number
+          returned_value: number
+          sale_id: string
+          user_id?: string | null
         }
         Update: {
-          amount?: number | null
-          city?: string
           created_at?: string
+          customer_id?: string | null
+          difference?: number
+          difference_payment?: string | null
+          given_name?: string
+          given_product_id?: string
+          given_qty?: number
+          given_value?: number
           id?: string
-          neighborhood?: string | null
-          serves?: boolean
+          kind?: string
+          notes?: string | null
+          returned_name?: string
+          returned_product_id?: string
+          returned_qty?: number
+          returned_value?: number
+          sale_id?: string
+          user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sale_exchanges_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_exchanges_given_product_id_fkey"
+            columns: ["given_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_exchanges_returned_product_id_fkey"
+            columns: ["returned_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_exchanges_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sale_items: {
         Row: {
@@ -555,111 +753,114 @@ export type Database = {
       }
       sales: {
         Row: {
+          city: string | null
           courier_id: string | null
           created_at: string
           customer_id: string | null
           delivery_address: string | null
           delivery_fee: number
           discount: number
+          fee_cost: number
           fee_due: boolean
           id: string
-          city: string | null
+          installments: number
           is_traffic: boolean
           neighborhood: string | null
           notes: string | null
           offer_id: string | null
+          paid_at: string | null
           payment_amount_2: number
           payment_method: string
           payment_method_2: string | null
-          paid_at: string | null
-          installments: number
-          surcharge_1: number
-          surcharge_2: number
-          fee_cost: number
-          shipping_method: string
-          tracking_code: string | null
+          pix_to: string | null
           proof_url: string | null
           reason: string | null
           route_id: string | null
           sale_number: number
           scheduled_for: string | null
           seller_id: string | null
+          shipping_method: string
           status: Database["public"]["Enums"]["order_status"]
           stop_order: number | null
           subtotal: number
+          surcharge_1: number
+          surcharge_2: number
           total: number
+          tracking_code: string | null
           updated_at: string
         }
         Insert: {
+          city?: string | null
           courier_id?: string | null
           created_at?: string
           customer_id?: string | null
           delivery_address?: string | null
           delivery_fee?: number
           discount?: number
+          fee_cost?: number
           fee_due?: boolean
           id?: string
-          city?: string | null
+          installments?: number
           is_traffic?: boolean
           neighborhood?: string | null
           notes?: string | null
           offer_id?: string | null
+          paid_at?: string | null
           payment_amount_2?: number
           payment_method?: string
           payment_method_2?: string | null
-          paid_at?: string | null
-          installments?: number
-          surcharge_1?: number
-          surcharge_2?: number
-          fee_cost?: number
-          shipping_method?: string
-          tracking_code?: string | null
+          pix_to?: string | null
           proof_url?: string | null
           reason?: string | null
           route_id?: string | null
           sale_number?: number
           scheduled_for?: string | null
           seller_id?: string | null
+          shipping_method?: string
           status?: Database["public"]["Enums"]["order_status"]
           stop_order?: number | null
           subtotal?: number
+          surcharge_1?: number
+          surcharge_2?: number
           total?: number
+          tracking_code?: string | null
           updated_at?: string
         }
         Update: {
+          city?: string | null
           courier_id?: string | null
           created_at?: string
           customer_id?: string | null
           delivery_address?: string | null
           delivery_fee?: number
           discount?: number
+          fee_cost?: number
           fee_due?: boolean
           id?: string
-          city?: string | null
+          installments?: number
           is_traffic?: boolean
           neighborhood?: string | null
           notes?: string | null
           offer_id?: string | null
+          paid_at?: string | null
           payment_amount_2?: number
           payment_method?: string
           payment_method_2?: string | null
-          paid_at?: string | null
-          installments?: number
-          surcharge_1?: number
-          surcharge_2?: number
-          fee_cost?: number
-          shipping_method?: string
-          tracking_code?: string | null
+          pix_to?: string | null
           proof_url?: string | null
           reason?: string | null
           route_id?: string | null
           sale_number?: number
           scheduled_for?: string | null
           seller_id?: string | null
+          shipping_method?: string
           status?: Database["public"]["Enums"]["order_status"]
           stop_order?: number | null
           subtotal?: number
+          surcharge_1?: number
+          surcharge_2?: number
           total?: number
+          tracking_code?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -760,7 +961,88 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_payment_fees: { Args: { p_sale: string }; Returns: undefined }
+      campaign_performance: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          campaign_id: string
+          campaign_name: string
+          clicks: number
+          conversations: number
+          impressions: number
+          spend: number
+        }[]
+      }
       close_route: { Args: { p_route: string }; Returns: Json }
+      create_order: {
+        Args: {
+          p_address?: string
+          p_city?: string
+          p_counter_sale?: boolean
+          p_customer: string
+          p_discount?: number
+          p_installments?: number
+          p_is_traffic?: boolean
+          p_items: Json
+          p_manual_fee?: number
+          p_neighborhood?: string
+          p_notes?: string
+          p_offer?: string
+          p_paid?: boolean
+          p_payment_method: string
+          p_shipping_method?: string
+        }
+        Returns: {
+          city: string | null
+          courier_id: string | null
+          created_at: string
+          customer_id: string | null
+          delivery_address: string | null
+          delivery_fee: number
+          discount: number
+          fee_cost: number
+          fee_due: boolean
+          id: string
+          installments: number
+          is_traffic: boolean
+          neighborhood: string | null
+          notes: string | null
+          offer_id: string | null
+          paid_at: string | null
+          payment_amount_2: number
+          payment_method: string
+          payment_method_2: string | null
+          pix_to: string | null
+          proof_url: string | null
+          reason: string | null
+          route_id: string | null
+          sale_number: number
+          scheduled_for: string | null
+          seller_id: string | null
+          shipping_method: string
+          status: Database["public"]["Enums"]["order_status"]
+          stop_order: number | null
+          subtotal: number
+          surcharge_1: number
+          surcharge_2: number
+          total: number
+          tracking_code: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "sales"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      crm_followup_message: { Args: never; Returns: string }
+      crm_settings_status: { Args: never; Returns: Json }
+      current_has_role: {
+        Args: { _role: Database["public"]["Enums"]["app_role"] }
+        Returns: boolean
+      }
+      customer_stats: { Args: { p_customer: string }; Returns: Json }
       delivery_quote: {
         Args: { p_city: string; p_neighborhood: string }
         Returns: {
@@ -771,73 +1053,13 @@ export type Database = {
           neighborhood: string | null
           serves: boolean
         }
-      }
-      create_order: {
-        Args: {
-          p_address?: string
-          p_city?: string
-          p_counter_sale?: boolean
-          p_customer: string
-          p_discount?: number
-          p_items: Json
-          p_is_traffic?: boolean
-          p_neighborhood?: string
-          p_notes?: string
-          p_offer?: string
-          p_paid?: boolean
-          p_installments?: number
-          p_shipping_method?: string
-          p_manual_fee?: number
-          p_payment_method: string
-        }
-        Returns: {
-          courier_id: string | null
-          created_at: string
-          customer_id: string | null
-          delivery_address: string | null
-          delivery_fee: number
-          discount: number
-          fee_due: boolean
-          id: string
-          city: string | null
-          is_traffic: boolean
-          neighborhood: string | null
-          notes: string | null
-          offer_id: string | null
-          payment_amount_2: number
-          payment_method: string
-          payment_method_2: string | null
-          paid_at: string | null
-          installments: number
-          surcharge_1: number
-          surcharge_2: number
-          fee_cost: number
-          shipping_method: string
-          tracking_code: string | null
-          proof_url: string | null
-          reason: string | null
-          route_id: string | null
-          sale_number: number
-          scheduled_for: string | null
-          seller_id: string | null
-          status: Database["public"]["Enums"]["order_status"]
-          stop_order: number | null
-          subtotal: number
-          total: number
-          updated_at: string
-        }
         SetofOptions: {
           from: "*"
-          to: "sales"
+          to: "delivery_zones"
           isOneToOne: true
           isSetofReturn: false
         }
       }
-      current_has_role: {
-        Args: { _role: Database["public"]["Enums"]["app_role"] }
-        Returns: boolean
-      }
-      customer_stats: { Args: { p_customer: string }; Returns: Json }
       dispatch_route: { Args: { p_route: string }; Returns: number }
       financial_by_offer: {
         Args: { p_from: string; p_to: string }
@@ -876,6 +1098,7 @@ export type Database = {
         }[]
       }
       meta_settings_status: { Args: never; Returns: Json }
+      norm_place: { Args: { p: string }; Returns: string }
       offer_performance: {
         Args: { p_from: string; p_to: string }
         Returns: {
@@ -908,6 +1131,105 @@ export type Database = {
           sales_count: number
         }[]
       }
+      payment_fee_pct: {
+        Args: { p_installments: number; p_method: string }
+        Returns: number
+      }
+      post_correios: {
+        Args: { p_fee?: number; p_sale: string; p_tracking?: string }
+        Returns: {
+          city: string | null
+          courier_id: string | null
+          created_at: string
+          customer_id: string | null
+          delivery_address: string | null
+          delivery_fee: number
+          discount: number
+          fee_cost: number
+          fee_due: boolean
+          id: string
+          installments: number
+          is_traffic: boolean
+          neighborhood: string | null
+          notes: string | null
+          offer_id: string | null
+          paid_at: string | null
+          payment_amount_2: number
+          payment_method: string
+          payment_method_2: string | null
+          pix_to: string | null
+          proof_url: string | null
+          reason: string | null
+          route_id: string | null
+          sale_number: number
+          scheduled_for: string | null
+          seller_id: string | null
+          shipping_method: string
+          status: Database["public"]["Enums"]["order_status"]
+          stop_order: number | null
+          subtotal: number
+          surcharge_1: number
+          surcharge_2: number
+          total: number
+          tracking_code: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "sales"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      product_cost_breakdown: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          product_id: string
+          product_name: string
+          quantity: number
+          revenue: number
+          total_cost: number
+          unit_cost: number
+        }[]
+      }
+      register_exchange: {
+        Args: {
+          p_given_product: string
+          p_given_qty: number
+          p_kind: string
+          p_notes?: string
+          p_payment?: string
+          p_returned_product: string
+          p_returned_qty: number
+          p_sale: string
+        }
+        Returns: {
+          created_at: string
+          customer_id: string | null
+          difference: number
+          difference_payment: string | null
+          given_name: string
+          given_product_id: string
+          given_qty: number
+          given_value: number
+          id: string
+          kind: string
+          notes: string | null
+          returned_name: string
+          returned_product_id: string
+          returned_qty: number
+          returned_value: number
+          sale_id: string
+          user_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "sale_exchanges"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      reorder_my_stops: { Args: { p_sales: string[] }; Returns: undefined }
       route_day_summary: {
         Args: { p_date?: string }
         Returns: {
@@ -944,9 +1266,91 @@ export type Database = {
           stops: number
         }[]
       }
+      sale_cash: {
+        Args: { s: Database["public"]["Tables"]["sales"]["Row"] }
+        Returns: number
+      }
+      sale_pix: {
+        Args: { s: Database["public"]["Tables"]["sales"]["Row"] }
+        Returns: number
+      }
+      sale_to_settle: {
+        Args: { s: Database["public"]["Tables"]["sales"]["Row"] }
+        Returns: number
+      }
+      save_crm_settings: {
+        Args: {
+          p_evolution_api_key?: string
+          p_evolution_api_url?: string
+          p_evolution_instance?: string
+          p_followup_message?: string
+        }
+        Returns: Json
+      }
       save_meta_settings: {
         Args: { p_account: string; p_token?: string }
         Returns: Json
+      }
+      set_delivery_payment: {
+        Args: {
+          p_amount_2?: number
+          p_installments?: number
+          p_method: string
+          p_method_2?: string
+          p_pix_to?: string
+          p_sale: string
+        }
+        Returns: {
+          city: string | null
+          courier_id: string | null
+          created_at: string
+          customer_id: string | null
+          delivery_address: string | null
+          delivery_fee: number
+          discount: number
+          fee_cost: number
+          fee_due: boolean
+          id: string
+          installments: number
+          is_traffic: boolean
+          neighborhood: string | null
+          notes: string | null
+          offer_id: string | null
+          paid_at: string | null
+          payment_amount_2: number
+          payment_method: string
+          payment_method_2: string | null
+          pix_to: string | null
+          proof_url: string | null
+          reason: string | null
+          route_id: string | null
+          sale_number: number
+          scheduled_for: string | null
+          seller_id: string | null
+          shipping_method: string
+          status: Database["public"]["Enums"]["order_status"]
+          stop_order: number | null
+          subtotal: number
+          surcharge_1: number
+          surcharge_2: number
+          total: number
+          tracking_code: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "sales"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      traffic_loose_performance: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          customers: number
+          revenue: number
+          sales_count: number
+        }[]
       }
       transition_sale: {
         Args: {
@@ -957,39 +1361,40 @@ export type Database = {
           p_to: Database["public"]["Enums"]["order_status"]
         }
         Returns: {
+          city: string | null
           courier_id: string | null
           created_at: string
           customer_id: string | null
           delivery_address: string | null
           delivery_fee: number
           discount: number
+          fee_cost: number
           fee_due: boolean
           id: string
-          city: string | null
+          installments: number
           is_traffic: boolean
           neighborhood: string | null
           notes: string | null
           offer_id: string | null
+          paid_at: string | null
           payment_amount_2: number
           payment_method: string
           payment_method_2: string | null
-          paid_at: string | null
-          installments: number
-          surcharge_1: number
-          surcharge_2: number
-          fee_cost: number
-          shipping_method: string
-          tracking_code: string | null
+          pix_to: string | null
           proof_url: string | null
           reason: string | null
           route_id: string | null
           sale_number: number
           scheduled_for: string | null
           seller_id: string | null
+          shipping_method: string
           status: Database["public"]["Enums"]["order_status"]
           stop_order: number | null
           subtotal: number
+          surcharge_1: number
+          surcharge_2: number
           total: number
+          tracking_code: string | null
           updated_at: string
         }
         SetofOptions: {
@@ -1027,12 +1432,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1056,11 +1461,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1081,11 +1486,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1106,11 +1511,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1123,11 +1528,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
