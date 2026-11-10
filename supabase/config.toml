@@ -5,3 +5,7 @@ project_id = "lvskhbngntvreyagduue"
 # barra chamada anônima antes mesmo de entrar no código.
 [functions.admin-create-user]
 verify_jwt = true
+
+# Mesma lógica: só admin redefine senha, conferido dentro da função.
+[functions.admin-set-password]
+verify_jwt = true

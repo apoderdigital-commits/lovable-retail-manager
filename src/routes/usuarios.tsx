@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { UserPlus, ShieldOff, Lock } from "lucide-react";
+import { UserPlus, ShieldOff, Lock, KeyRound, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
@@ -46,6 +46,33 @@ const ROLES: { value: Role; hint: string }[] = [
   { value: "courier", hint: "Só a própria rota de entrega" },
 ];
 
+// chama uma Edge Function de admin e devolve a mensagem real do servidor.
+// quando a função responde com status de erro, o supabase-js entrega só
+// "non-2xx status code" e guarda o corpo em error.context; sem ler dali,
+// a mensagem real nunca chega na tela.
+async function invokeAdminFunction(name: string, body: Record<string, unknown>) {
+  const { data, error } = await supabase.functions.invoke(name, { body });
+
+  if (error) {
+    let detail = error.message;
+    const res = (error as { context?: Response }).context;
+    if (res && typeof res.json === "function") {
+      try {
+        const parsed = await res.json();
+        if (parsed?.error) detail = parsed.error;
+      } catch {
+        // corpo não era JSON: fica a mensagem genérica mesmo
+      }
+    }
+    throw new Error(detail);
+  }
+
+  if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
+  return data;
+}
+
+type ResetTarget = { id: string; name: string; email: string | null };
+
 export const Route = createFileRoute("/usuarios")({
   head: () => ({
     meta: [
@@ -84,32 +111,18 @@ function UsersPage() {
     },
   });
 
+  const [resetTarget, setResetTarget] = useState<ResetTarget | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+
+  const openReset = (target: ResetTarget) => {
+    setNewPassword("");
+    setShowNewPassword(false);
+    setResetTarget(target);
+  };
+
   const create = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke("admin-create-user", {
-        body: form,
-      });
-
-      // quando a função responde com status de erro, o supabase-js entrega
-      // só "non-2xx status code" e guarda o corpo em error.context. sem ler
-      // dali, a mensagem real do servidor nunca chega na tela.
-      if (error) {
-        let detail = error.message;
-        const res = (error as { context?: Response }).context;
-        if (res && typeof res.json === "function") {
-          try {
-            const body = await res.json();
-            if (body?.error) detail = body.error;
-          } catch {
-            // corpo não era JSON: fica a mensagem genérica mesmo
-          }
-        }
-        throw new Error(detail);
-      }
-
-      if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
-      return data;
-    },
+    mutationFn: () => invokeAdminFunction("admin-create-user", form),
     onSuccess: () => {
       toast.success("Acesso criado");
       setOpen(false);
@@ -128,6 +141,17 @@ function UsersPage() {
     onSuccess: () => {
       toast.success("Papel atualizado");
       qc.invalidateQueries({ queryKey: ["users"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const resetPassword = useMutation({
+    mutationFn: (vars: { userId: string; password: string }) =>
+      invokeAdminFunction("admin-set-password", { user_id: vars.userId, password: vars.password }),
+    onSuccess: () => {
+      toast.success("Senha redefinida. Entregue a nova senha à pessoa.");
+      setResetTarget(null);
+      setNewPassword("");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -303,16 +327,31 @@ function UsersPage() {
                     )}
                   </TableCell>
                   <TableCell className="text-right">
-                    {current && !isSelf && !lastAdmin && (
+                    <div className="flex flex-wrap justify-end gap-1">
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => revoke.mutate(p.id)}
-                        disabled={revoke.isPending}
+                        onClick={() =>
+                          openReset({
+                            id: p.id,
+                            name: p.full_name || "sem nome",
+                            email: p.email,
+                          })
+                        }
                       >
-                        <ShieldOff className="mr-1.5 size-3.5 text-destructive" /> Revogar
+                        <KeyRound className="mr-1.5 size-3.5" /> Redefinir senha
                       </Button>
-                    )}
+                      {current && !isSelf && !lastAdmin && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => revoke.mutate(p.id)}
+                          disabled={revoke.isPending}
+                        >
+                          <ShieldOff className="mr-1.5 size-3.5 text-destructive" /> Revogar
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               );
@@ -331,6 +370,83 @@ function UsersPage() {
       <p className="mt-3 text-xs text-muted-foreground">
         Revogar tira todo o acesso, mas não apaga a conta nem o histórico do que a pessoa fez.
       </p>
+
+      <Dialog
+        open={resetTarget !== null}
+        onOpenChange={(o) => {
+          if (!o && !resetPassword.isPending) setResetTarget(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Redefinir senha</DialogTitle>
+          </DialogHeader>
+          {resetTarget && (
+            <form
+              className="space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (newPassword.length < 8 || newPassword.length > 72) return;
+                resetPassword.mutate({ userId: resetTarget.id, password: newPassword });
+              }}
+            >
+              <div className="rounded-md bg-muted px-3 py-2 text-sm">
+                <p className="font-medium">{resetTarget.name}</p>
+                {resetTarget.email && (
+                  <p className="text-xs text-muted-foreground">{resetTarget.email}</p>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="new-password">Nova senha</Label>
+                <div className="relative">
+                  <Input
+                    id="new-password"
+                    type={showNewPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    className="pr-10"
+                    placeholder="mínimo 8 caracteres"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword((v) => !v)}
+                    className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground hover:text-foreground"
+                    aria-label={showNewPassword ? "Esconder senha" : "Mostrar senha"}
+                    title={showNewPassword ? "Esconder senha" : "Mostrar senha"}
+                  >
+                    {showNewPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  A senha antiga deixa de valer na hora. Entregue a nova à pessoa.
+                </p>
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setResetTarget(null)}
+                  disabled={resetPassword.isPending}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={
+                    resetPassword.isPending || newPassword.length < 8 || newPassword.length > 72
+                  }
+                >
+                  {resetPassword.isPending ? "Salvando..." : "Redefinir senha"}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
 }
