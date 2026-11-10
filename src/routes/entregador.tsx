@@ -507,7 +507,7 @@ type Stop = {
   payment_method: string;
   payment_method_2: string | null;
   payment_amount_2: number;
-  pix_to?: "maquina" | "entregador" | null;
+  pix_to?: string | null;
   // pago no lançamento: não cobra na entrega, só foto
   paid_at?: string | null;
   // taxa da maquininha já somada em total, e parcelas do crédito
@@ -606,7 +606,9 @@ function StopCard({
   };
   // pix: caiu na máquina (loja) ou na chave do entregador (entra no acerto)
   const hasPix = pay1 === "pix" || (split && pay2 === "pix");
-  const [pixTo, setPixTo] = useState<"maquina" | "entregador" | "">(stop.pix_to ?? "");
+  const [pixTo, setPixTo] = useState<"maquina" | "entregador" | "">(
+    stop.pix_to === "maquina" || stop.pix_to === "entregador" ? stop.pix_to : "",
+  );
   const pixMissing = !paid && hasPix && !pixTo;
   const paymentChanged =
     !paid &&
